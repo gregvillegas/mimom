@@ -1,0 +1,76 @@
+<nav class="navbar navbar-expand-md navbar-dark bg-primary sticky-top shadow-sm border-bottom border-primary-subtle">
+    <div class="container-fluid">
+        <button class="navbar-toggler d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <a class="navbar-brand fw-semibold me-auto me-md-3 d-flex align-items-center gap-2" href="{% url 'home' %}">
+            <i class="bi bi-journal-text fs-4"></i>
+            <span class="d-none d-sm-inline">MIMOM Intranet</span>
+        </a>
+
+        <ul class="navbar-nav flex-row align-items-center ms-auto gap-1">
+            <li class="nav-item">
+                <a class="nav-link px-2 px-md-3 position-relative" href="#" title="Notifications">
+                    <i class="bi bi-bell fs-5"></i>
+                    <span class="position-absolute top-25 start-75 translate-middle badge rounded-pill bg-danger d-none">
+                        0
+                    </span>
+                </a>
+            </li>
+
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle d-flex align-items-center gap-2 px-2 px-md-3" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="d-flex align-items-center justify-content-center rounded-circle bg-white text-primary fw-semibold" style="width: 30px; height: 30px; font-size: 0.8rem;">
+                        {{ user.get_initials }}
+                    </span>
+                    <span class="d-none d-md-inline">{{ user.get_display_name }}</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2">
+                    <li><h6 class="dropdown-header text-muted small">Signed in as</h6></li>
+                    <li class="px-3 pb-2">
+                        <div class="fw-semibold">{{ user.get_display_name }}</div>
+                        <div class="small text-muted">{{ user.email }}</div>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center gap-2" href="{% url 'accounts:profile_me' %}">
+                            <i class="bi bi-person-circle"></i> My Profile
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center gap-2" href="{% url 'accounts:password_change' %}">
+                            <i class="bi bi-key"></i> Change Password
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    {% load permissions %}
+                    {% can_manage_users_tag as can_manage_users %}
+                    {% if can_manage_users %}
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center gap-2" href="{% url 'accounts:user_list' %}">
+                            <i class="bi bi-people"></i> Manage Users
+                        </a>
+                    </li>
+                    {% endif %}
+                    {% if user.is_staff %}
+                    <li>
+                        <a class="dropdown-item d-flex align-items-center gap-2" href="{% url 'admin:index' %}">
+                            <i class="bi bi-gear"></i> System Admin
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form action="{% url 'logout' %}" method="post" class="m-0">
+                            {% csrf_token %}
+                            <button type="submit" class="dropdown-item d-flex align-items-center gap-2 text-danger">
+                                <i class="bi bi-box-arrow-right"></i> Sign out
+                            </button>
+                        </form>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+</nav>

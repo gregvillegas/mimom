@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+{% load permissions %}
+
+{% block title %}Meetings{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row mb-3 align-items-end">
+    <div class="col">
+      <h1 class="h3 mb-1">Meetings</h1>
+      <div class="text-muted small">View, filter, and create management meetings.</div>
+    </div>
+    <div class="col-auto">
+      {% if can_create %}
+        <a class="btn btn-primary" href="{% url 'meetings:meeting_create' %}">
+          <i class="bi bi-plus-circle me-1"></i> New Meeting
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header d-flex flex-wrap align-items-center gap-2">
+      <ul class="nav nav-tabs card-header-tabs me-auto flex-nowrap" role="tablist">
+        <li class="nav-item">
+          <a class="nav-link {% if view_mode == 'list' %}active{% endif %}" href="{{ list_view_url }}">
+            <i class="bi bi-list-task me-1"></i> List
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if view_mode == 'calendar' %}active{% endif %}" href="{{ calendar_view_url }}">
+            <i class="bi bi-calendar3 me-1"></i> Calendar
+          </a>
+        </li>
+      </ul>
+      <form class="d-flex flex-wrap gap-2 align-items-end" method="get" action="">
+        <input type="hidden" name="view" value="{{ view_mode }}">
+        <div class="col-auto">
+          <label class="visually-hidden" for="id_q">Search</label>
+          <input type="search" name="q" value="{{ request.GET.q }}" id="id_q" class="form-control form-control-sm" placeholder="Search title / reference / location">
+        </div>
+        <div class="col-auto">
+          <label class="visually-hidden" for="id_status">Status</label>
+          <select class="form-select form-select-sm" id="id_status" name="status">
+            <option value="">Any status</option>
+            {% for val, label in status_choices %}
+              <option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-auto">
+          <label class="visually-hidden" for="id_department">Department</label>
+          <select class="form-select form-select-sm" id="id_department" name="department">
+            <option value="">Any department</option>
+            {% for d in departments %}
+              <option value="{{ d.pk }}" {% if request.GET.department == d.pk|stringformat:"s" %}selected{% endif %}>{{ d.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-auto">
+          <button class="btn btn-sm btn-outline-primary">Filter</button>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'meetings:meeting_list' %}?view={{ view_mode }}">Clear</a>
+        </div>
+      </form>
+    </div>
+
+    {% if view_mode == 'list' %}
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover table-sm mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Reference</th>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Start</th>
+                <th>Chair</th>
+                <th>Department</th>
+                <th class="text-end"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for m in meetings %}
+                <tr>
+                  <td class="font-monospace small"><a href="{% url 'meetings:meeting_detail' m.pk %}">{{ m.reference }}</a></td>
+                  <td><a href="{% url 'meetings:meeting_detail' m.pk %}" class="text-decoration-none text-body">{{ m.title }}</a></td>
+                  <td>{{ m.type.name }}</td>
+                  <td>
+                    {% with meeting=m %}
+                      {% include 'meetings/_partials/status_badges.html' %}
+                    {% endwith %}
+                    {% if m.is_locked %}<span class="badge bg-dark ms-1"><i class="bi bi-lock-fill small"></i></span>{% endif %}
+                  </td>
+                  <td><span class="small">{{ m.start_at|date:"M d, Y H:i" }}</span></td>
+                  <td>{% if m.chair %}{{ m.chair.get_display_name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                  <td>{% if m.department %}{{ m.department.name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                  <td class="text-end">
+                    <a class="btn btn-sm btn-outline-primary" href="{% url 'meetings:meeting_detail' m.pk %}">Open</a>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="8" class="text-center py-4 text-muted">No meetings found for current filters.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% if is_paginated %}
+        <div class="card-footer">
+          <nav aria-label="Meetings pagination">
+            <ul class="pagination pagination-sm mb-0 justify-content-center">
+              {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?view={{ view_mode }}&page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.department %}&department={{ request.GET.department }}{% endif %}">Previous</a></li>
+              {% endif %}
+              <li class="page-item active"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+              {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?view={{ view_mode }}&page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}{% if request.GET.department %}&department={{ request.GET.department }}{% endif %}">Next</a></li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
+      {% endif %}
+    {% else %}
+      <div class="card-body p-0">
+        <div class="d-flex justify-content-between align-items-center p-3 border-bottom">
+          <a class="btn btn-sm btn-outline-secondary" href="{{ prev_month_url }}">&larr; Prev</a>
+          <div class="fw-semibold">{{ month_name_year }}</div>
+          <a class="btn btn-sm btn-outline-secondary" href="{{ next_month_url }}">Next &rarr;</a>
+        </div>
+        <div class="p-3">
+          <div class="d-none d-md-grid grid gap-1 text-center small text-muted mb-2" style="grid-template-columns: repeat(7, minmax(0,1fr));">
+            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+          </div>
+          <div class="d-grid gap-1" style="grid-template-columns: repeat(7, minmax(0,1fr));">
+            {% for cell in calendar_cells %}
+              <div class="min-vh-15 border rounded p-1 d-flex flex-column{% if cell.is_today %} bg-primary bg-opacity-10{% endif %}{% if not cell.in_month %} bg-light text-muted{% endif %}" style="min-height: 6rem;">
+                <div class="small fw-semibold">{{ cell.date|date:"d" }}</div>
+                <div class="flex-grow-1 overflow-y-auto">
+                  {% for m in cell.meetings %}
+                    <a href="{% url 'meetings:meeting_detail' m.pk %}" class="d-block text-decoration-none bg-primary bg-opacity-10 text-primary small px-1 py-05 rounded mb-1 text-truncate" title="{{ m.reference }} — {{ m.title }}">
+                      <span class="small">{{ m.start_at|date:"H:i" }}</span>
+                      <span class="ms-1 text-truncate">{{ m.title }}</span>
+                    </a>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

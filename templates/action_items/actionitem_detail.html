@@ -1,0 +1,365 @@
+{% extends 'base.html' %}
+{% load permissions %}
+
+{% block title %}{{ action.title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-sm-flex flex-wrap align-items-sm-end gap-2 justify-content-between mb-3">
+    <div>
+      <div class="d-flex gap-2 align-items-center mb-1 flex-wrap">
+        <span class="text-muted small font-monospace">{{ action.reference }}</span>
+        {% with action=action %}
+          {% include 'action_items/_partials/status_badges.html' %}
+        {% endwith %}
+        {% if not action.is_editable %}<span class="badge bg-dark"><i class="bi bi-lock-fill"></i> Locked</span>{% endif %}
+        {% if action.is_overdue %}<span class="badge bg-warning text-dark">Overdue {{ action.overdue_age_days }}d</span>{% endif %}
+      </div>
+      <h1 class="h2 mb-0">{{ action.title }}</h1>
+      <div class="text-muted small">
+        {% if action.department %}<i class="bi bi-diagram-3 me-1"></i>{{ action.department.name }} &nbsp;· {% endif %}
+        {% if action.owner %}Owner: <strong>{{ action.owner.get_display_name }}</strong> &nbsp;· {% endif %}
+        <i class="bi bi-calendar-event me-1"></i>Due {{ action.due_date|date:"M d, Y" }}
+        {% if action.source_meeting %}
+          &nbsp;· <i class="bi bi-diagram-2 me-1"></i>From <a href="{% url 'meetings:meeting_detail' action.source_meeting.pk %}">{{ action.source_meeting.reference }}</a>
+        {% endif %}
+        {% if action.carried_forward_from %}
+          &nbsp;· <i class="bi bi-arrow-right-circle me-1"></i>Carried from <a href="{% url 'action_items:actionitem_detail' action.carried_forward_from.pk %}">{{ action.carried_forward_from.reference }}</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="btn-group flex-wrap" role="group">
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'action_items:actionitem_list' %}">
+        <i class="bi bi-arrow-left me-1"></i> All Items
+      </a>
+      {% if can_edit %}
+        <a class="btn btn-outline-primary btn-sm" href="{% url 'action_items:actionitem_update' action.pk %}">
+          <i class="bi bi-pencil me-1"></i> Edit
+        </a>
+      {% endif %}
+      {% if can_complete and action.status != 'COMPLETED' and action.status != 'CANCELLED' %}
+        <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#completeModal">
+          <i class="bi bi-check-circle me-1"></i> Complete
+        </button>
+      {% endif %}
+      {% if can_reopen and action.status in 'COMPLETED,CANCELLED' %}
+        <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#reopenModal">
+          <i class="bi bi-arrow-counterclockwise me-1"></i> Reopen
+        </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="card mb-4 shadow-sm" id="summary">
+        <div class="card-header">
+          <ul class="nav nav-tabs card-header-tabs flex-nowrap overflow-x-auto" role="tablist" id="detailTabs">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-summary" type="button">Summary</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-assignees" type="button" id="assignees-tab">Assignees ({{ action.assignees.all|length }})</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-updates" type="button" id="updates-tab">Updates ({{ action.updates.all|length }})</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-attachments" type="button" id="attachments-tab">Attachments ({{ action.attachments.all|length }})</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-history" type="button" id="status-tab">Status History</button></li>
+          </ul>
+        </div>
+        <div class="card-body tab-content">
+          <div class="tab-pane fade show active" id="tab-summary">
+            {% if action.description %}
+              <div class="mb-3">
+                <div class="small text-muted fw-semibold mb-1">Description</div>
+                <p class="mb-0 whitespace-pre-wrap">{{ action.description }}</p>
+              </div>
+            {% endif %}
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-md-4 small">
+                <div class="text-muted">Priority</div>
+                <div class="fw-medium">{{ action.get_priority_display }}</div>
+              </div>
+              <div class="col-12 col-md-4 small">
+                <div class="text-muted">Progress</div>
+                <div class="d-flex gap-2 align-items-center">
+                  <div class="progress flex-grow-1" style="height:10px;">
+                    <div class="progress-bar {% if action.progress_pct >= 100 %}bg-success{% elif action.progress_pct >= 50 %}bg-primary{% else %}bg-secondary{% endif %}" style="width: {{ action.progress_pct }}%;"></div>
+                  </div>
+                  <span class="fw-medium">{{ action.progress_pct }}%</span>
+                </div>
+              </div>
+              <div class="col-12 col-md-4 small">
+                <div class="text-muted">Reopened</div>
+                <div class="fw-medium">{{ action.reopened_count }} times</div>
+              </div>
+            </div>
+            {% if action.next_steps %}
+              <div class="mb-3">
+                <div class="small text-muted fw-semibold mb-1">Next Steps</div>
+                <p class="mb-0 whitespace-pre-wrap">{{ action.next_steps }}</p>
+              </div>
+            {% endif %}
+            {% if action.blockers %}
+              <div class="mb-3 alert alert-danger bg-opacity-25">
+                <div class="small text-danger fw-semibold mb-1">Blockers</div>
+                <p class="mb-0 whitespace-pre-wrap">{{ action.blockers }}</p>
+              </div>
+            {% endif %}
+            <div id="status" class="mb-0">
+              <form method="post" action="{% url 'action_items:actionitem_transition' action.pk %}" class="row g-2 align-items-end">
+                {% csrf_token %}
+                <div class="col-12 col-md-5">
+                  <label class="form-label small">Change Status</label>
+                  {{ transition_form.target_status }}
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label small">Reason (required for reopen / cancel Under Review)</label>
+                  {{ transition_form.reason }}
+                </div>
+                <div class="col-12 col-md-auto">
+                  <button class="btn btn-primary" {% if not can_edit %}disabled{% endif %}>Apply</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="tab-assignees">
+            <form id="assignees" method="post" action="{% url 'action_items:actionitem_assignees_save' action.pk %}">
+              {% csrf_token %}
+              {{ assignee_formset.management_form }}
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-3">
+                  <thead class="table-light">
+                    <tr>
+                      <th>User</th>
+                      <th>Primary</th>
+                      <th>Supporting</th>
+                      <th>Notes</th>
+                      <th>Remove</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for form in assignee_formset.forms %}
+                      <tr>
+                        <td>
+                          {{ form.id }}
+                          {{ form.user }}
+                        </td>
+                        <td>{{ form.is_primary }}</td>
+                        <td>{{ form.is_supporting }}</td>
+                        <td>{{ form.notes }}</td>
+                        <td>{{ form.DELETE }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary btn-sm" {% if not can_edit %}disabled{% endif %}>Save Assignees</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="tab-pane fade" id="tab-updates">
+            <div class="mb-4">
+              <form method="post" id="updates" action="{% url 'action_items:actionitem_add_update' action.pk %}" enctype="multipart/form-data" class="row g-2 align-items-end">
+                {% csrf_token %}
+                <div class="col-12 col-md-9">
+                  <label class="form-label small">Add Update</label>
+                  {{ update_form.body }}
+                </div>
+                <div class="col-12 col-md-3">
+                  <label class="form-label small">Attachment (optional)</label>
+                  {{ update_form.attachment }}
+                </div>
+                <div class="col-12 text-end">
+                  <button class="btn btn-outline-primary btn-sm" {% if not can_edit %}disabled{% endif %}>Post Update</button>
+                </div>
+              </form>
+            </div>
+            {% for u in action.updates.all|dictsortreversed:"created_at" %}
+              <div class="border rounded p-3 mb-3 shadow-sm">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <div>
+                    <strong>{{ u.author.get_display_name|default:"System" }}</strong>
+                    <span class="small text-muted ms-2">{{ u.created_at|date:"M d, Y H:i" }}</span>
+                    <span class="badge bg-light text-dark border ms-2">{{ u.get_status_snapshot_display }}</span>
+                    <span class="small text-muted ms-1">{{ u.progress_snapshot }}%</span>
+                  </div>
+                </div>
+                <div class="whitespace-pre-wrap mb-2">{{ u.body }}</div>
+                {% if u.attachment %}
+                  <a class="btn btn-sm btn-outline-secondary" href="{{ u.attachment.url }}" target="_blank" rel="noopener">
+                    <i class="bi bi-file-earmark me-1"></i>{{ u.attachment.name|default:"Attachment" }}
+                  </a>
+                {% endif %}
+              </div>
+            {% empty %}
+              <div class="text-muted text-center py-4">No updates yet.</div>
+            {% endfor %}
+          </div>
+
+          <div class="tab-pane fade" id="tab-attachments">
+            <form method="post" id="attachments" action="{% url 'action_items:actionitem_attach' action.pk %}" enctype="multipart/form-data" class="row g-2 align-items-end mb-4">
+              {% csrf_token %}
+              <div class="col-12 col-md-6">{{ attachment_form.file }}</div>
+              <div class="col-12 col-md-5">{{ attachment_form.caption }}</div>
+              <div class="col-12 col-md-auto">
+                <button class="btn btn-outline-primary btn-sm" {% if not can_edit %}disabled{% endif %}>Upload</button>
+              </div>
+            </form>
+            <div class="list-group">
+              {% for a in action.attachments.all|dictsortreversed:"created_at" %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                  <a href="{{ a.file.url }}" target="_blank" rel="noopener" class="text-decoration-none text-body">
+                    <i class="bi bi-file-earmark me-2"></i>{{ a.filename }}
+                    {% if a.caption %}<span class="text-muted ms-2 small">{{ a.caption }}</span>{% endif %}
+                  </a>
+                  <div>
+                    <span class="small text-muted me-2">{{ a.created_at|date:"M d, Y" }} · {{ a.uploaded_by.get_display_name }}</span>
+                    {% if can_edit %}
+                      <form method="post" action="{% url 'action_items:attachment_delete' a.pk %}" class="d-inline" onsubmit="return confirm('Delete this attachment?');">
+                        {% csrf_token %}
+                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                      </form>
+                    {% endif %}
+                  </div>
+                </div>
+              {% empty %}
+                <div class="list-group-item text-muted text-center py-4">No attachments.</div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="tab-history">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>At</th>
+                  <th>By</th>
+                  <th>From → To</th>
+                  <th>Progress</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for h in action.status_history.all|dictsortreversed:"transitioned_at" %}
+                  <tr>
+                    <td class="small">{{ h.transitioned_at|date:"M d, Y H:i" }}</td>
+                    <td>{% if h.transitioned_by %}{{ h.transitioned_by.get_display_name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                    <td><strong>{{ h.get_from_status_display }}</strong> → <strong>{{ h.get_to_status_display }}</strong></td>
+                    <td>{{ h.progress_before }}% → {{ h.progress_after }}%</td>
+                    <td class="small">{% if h.reason %}<span class="whitespace-pre-wrap">{{ h.reason }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="5" class="text-center text-muted py-4">No status transitions recorded.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card mb-4 shadow-sm">
+        <div class="card-header"><strong>Ownership</strong></div>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item d-flex justify-content-between"><span class="text-muted small">Owner</span><span>{% if action.owner %}{{ action.owner.get_display_name }}{% else %}<span class="text-muted">—</span>{% endif %}</span></li>
+          <li class="list-group-item d-flex justify-content-between"><span class="text-muted small">Primary Assignee</span><span>{% if action.primary_assignee %}{{ action.primary_assignee.get_display_name }}{% else %}<span class="text-muted">—</span>{% endif %}</span></li>
+          <li class="list-group-item d-flex justify-content-between"><span class="text-muted small">Supporting</span><span>{{ action.supporting_users|length }}</span></li>
+          <li class="list-group-item d-flex justify-content-between"><span class="text-muted small">Created by</span><span>{{ action.created_by.get_display_name }}</span></li>
+          <li class="list-group-item d-flex justify-content-between"><span class="text-muted small">Last modified</span><span class="small">{{ action.updated_at|date:"M d, Y H:i" }}</span></li>
+        </ul>
+      </div>
+
+      {% if action.carried_forward_links.all or action.carry_forward_sources.all %}
+        <div class="card mb-4 shadow-sm">
+          <div class="card-header"><strong>Carry-Forward History</strong></div>
+          <ul class="list-group list-group-flush small">
+            {% for link in action.carried_forward_links.all %}
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>→ carried to <a href="{% url 'action_items:actionitem_detail' link.new_item.pk %}">{{ link.new_item.reference }}</a></span>
+                <span class="text-muted">{{ link.carried_at|date:"M d, Y" }}</span>
+              </li>
+            {% endfor %}
+            {% for link in action.carry_forward_sources.all %}
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>← carried from <a href="{% url 'action_items:actionitem_detail' link.source_item.pk %}">{{ link.source_item.reference }}</a></span>
+                <span class="text-muted">{{ link.carried_at|date:"M d, Y" }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="completeModal" tabindex="-1" aria-labelledby="completeModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="complete" action="{% url 'action_items:actionitem_complete' action.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="progress_pct" value="100">
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="completeModalLabel">Mark Action Item Complete</h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Completion Summary</label>
+            <textarea class="form-control" name="completion_summary" rows="4" required placeholder="Describe what was delivered, links to outputs, sign-off notes, etc."></textarea>
+          </div>
+          <div class="mb-0">
+            <label class="form-check">
+              <input class="form-check-input" type="checkbox" name="blockers_clear" required>
+              <span class="form-check-label">I confirm the Blockers field has been cleared.</span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success">Mark Complete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="reopenModal" tabindex="-1" aria-labelledby="reopenModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="reopen" action="{% url 'action_items:actionitem_reopen' action.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="reopenModalLabel">Reopen Action Item</h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Reason (required)</label>
+            <textarea class="form-control" name="reason" rows="4" required placeholder="Why is this item being re-opened? Include follow-up scope."></textarea>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">New Priority</label>
+              <select class="form-select" name="new_priority">
+                <option value="">Keep existing</option>
+                <option value="URGENT">Urgent</option>
+                <option value="HIGH">High</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="LOW">Low</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">New Due Date</label>
+              <input type="date" class="form-control" name="new_due_date">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-warning">Reopen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

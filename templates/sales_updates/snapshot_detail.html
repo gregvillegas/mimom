@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% load permissions %}
+{% load sales_formatting %}
+
+{% block title %}Snapshot · {{ snapshot.group.name }} / {{ snapshot.period.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-2 small">
+      <li class="breadcrumb-item"><a href="{% url 'sales_updates:group_dashboard_period' snapshot.period.pk %}">{{ snapshot.period.name }}</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'sales_updates:group_period_detail' snapshot.group.pk snapshot.period.pk %}">{{ snapshot.group.name }}</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Snapshot · {{ snapshot.created_at|date:"SHORT_DATE_FORMAT" }}</li>
+    </ol>
+  </nav>
+
+  <div class="row mb-4 align-items-end">
+    <div class="col">
+      <h1 class="h3 mb-1">
+        Performance Snapshot
+        {% if locked %}
+          <span class="badge bg-secondary fs-6 align-middle ms-2">
+            <i class="bi bi-lock me-1"></i>Locked
+          </span>
+        {% else %}
+          <span class="badge bg-light text-dark fs-6 align-middle ms-2">
+            <i class="bi bi-unlock me-1"></i>Editable
+          </span>
+        {% endif %}
+      </h1>
+      <div class="text-muted small">
+        Group: <strong>{{ snapshot.group.name }}</strong>
+        · Period: <strong>{{ snapshot.period.name }}</strong>
+        · Meeting: {% if snapshot.meeting %}
+          <a href="{% url 'meetings:meeting_detail' snapshot.meeting.pk %}">{{ snapshot.meeting.reference }}</a>
+        {% else %}<span class="text-muted">—</span>{% endif %}
+        · Currency: <strong>{{ snapshot.period.get_currency_display }}</strong>
+      </div>
+    </div>
+    <div class="col-auto">
+      <a class="btn btn-outline-secondary btn-sm"
+         href="{% url 'sales_updates:snapshot_printable' snapshot.pk %}" target="_blank">
+        <i class="bi bi-printer me-1"></i>Print
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="small text-muted">Revenue Target</div>
+          <div class="fs-5 fw-bold">{% currency_cell snapshot.revenue_target currency %}</div>
+          <div class="small mt-2 text-muted">Actual</div>
+          <div class="fs-6 fw-semibold">{% currency_cell snapshot.revenue_actual currency %}</div>
+          <div class="small mt-2">
+            <strong>{{ snapshot.revenue_pct_achieved|percentage }}</strong>
+            · Deficit
+            <span class="{{ snapshot.revenue_deficit|negative_class }}">
+              {% currency_cell snapshot.revenue_deficit currency signed=True %}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="small text-muted">Profit Target</div>
+          <div class="fs-5 fw-bold">{% currency_cell snapshot.profit_target currency %}</div>
+          <div class="small mt-2 text-muted">Actual</div>
+          <div class="fs-6 fw-semibold">{% currency_cell snapshot.profit_actual currency %}</div>
+          <div class="small mt-2">
+            <strong>{{ snapshot.profit_pct_achieved|percentage }}</strong>
+            · Deficit
+            <span class="{{ snapshot.profit_deficit|negative_class }}">
+              {% currency_cell snapshot.profit_deficit currency signed=True %}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="small text-muted">Margin</div>
+          <div class="fs-5 fw-bold">{{ snapshot.margin_pct_actual|percentage }}</div>
+          <div class="small mt-2">Target: {{ snapshot.margin_pct_target|percentage }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="small text-muted">Deliveries / on-time</div>
+          <div class="fs-5 fw-bold">
+            {{ snapshot.deliveries_achieved }} / {{ snapshot.deliveries_target }}
+          </div>
+          <div class="small mt-2">
+            On-time: <strong>{{ snapshot.on_time_pct|percentage }}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <form method="post"
+        action="{% url 'sales_updates:snapshot_weekly_save' snapshot.pk %}"
+        id="weekly-form" class="card shadow-sm mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <strong>Weekly commitments ({{ snapshot.period.weeks_count }} weeks)</strong>
+      <div>
+        {% if can_edit %}
+          <button class="btn btn-primary btn-sm" type="submit">Save weekly</button>
+        {% else %}
+          <span class="text-muted small">Locked — no edits allowed.</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card-body">
+      {% csrf_token %}
+      {{ weekly_formset.management_form }}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Week</th>
+              <th>Committed revenue</th>
+              <th>Committed profit</th>
+              <th>Actual revenue</th>
+              <th>Actual profit</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in weekly_formset %}
+              <tr>
+                <td>
+                  {{ f.id }}{{ f.week_number }}
+                  {{ f.week_number.errors }}
+                </td>
+                <td>{{ f.committed_revenue }}{{ f.committed_revenue.errors }}</td>
+                <td>{{ f.committed_profit }}{{ f.committed_profit.errors }}</td>
+                <td>{{ f.actual_revenue }}{{ f.actual_revenue.errors }}</td>
+                <td>{{ f.actual_profit }}{{ f.actual_profit.errors }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="table-secondary">
+              <th scope="row">Total</th>
+              <th>{% currency_cell weekly_totals.committed_revenue currency %}</th>
+              <th>{% currency_cell weekly_totals.committed_profit currency %}</th>
+              <th>{% currency_cell weekly_totals.actual_revenue currency %}</th>
+              <th>{% currency_cell weekly_totals.actual_profit currency %}</th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+intranet/
+├── manage.py
+├── requirements.txt
+├── .env.example
+├── .gitignore
+├── README.md
+│
+├── config/
+│   ├── init.py
+│   ├── asgi.py
+│   ├── settings/
+│   │   ├── init.py
+│   │   ├── base.py
+│   │   ├── development.py
+│   │   └── production.py
+│   ├── urls.py
+│   └── wsgi.py
+│
+├── apps/
+│   ├── core/
+│   ├── accounts/
+│   ├── meetings/
+│   ├── action_items/
+│   ├── sales_updates/
+│   ├── notifications/
+│   ├── audit/
+│   │
+│   ├── warehouse/          # Future module
+│   ├── marketing/          # Future module
+│   ├── product_updates/    # Future module
+│   └── accounting/         # Future module
+│
+├── templates/
+│   ├── base.html
+│   ├── components/
+│   ├── includes/
+│   ├── registration/
+│   ├── dashboard/
+│   ├── meetings/
+│   ├── action_items/
+│   └── errors/
+│
+├── static/
+│   ├── css/
+│   ├── js/
+│   ├── images/
+│   └── vendor/
+│
+├── media/
+│   ├── meeting_attachments/
+│   ├── generated_minutes/
+│   └── exports/
+│
+├── fixtures/
+├── docs/
+├── scripts/
+└── tests/

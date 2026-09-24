@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% load permissions %}
+{% load sales_formatting %}
+
+{% block title %}Sales Reports & Exports{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row mb-4 align-items-end">
+    <div class="col">
+      <h1 class="h3 mb-1">Sales Reports & Exports</h1>
+      <div class="text-muted small">
+        Generate period performance snapshots and export data to Excel for further analysis.
+      </div>
+    </div>
+    <div class="col-auto">
+      <a class="btn btn-outline-secondary btn-sm"
+         href="{% url 'sales_updates:group_dashboard' %}">
+        <i class="bi bi-grid-3x3-gap me-1"></i> Performance dashboard
+      </a>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-header"><strong>Create performance snapshot</strong></div>
+        <form method="post" action="{% url 'sales_updates:snapshot_create' %}">
+          {% csrf_token %}
+          <div class="card-body">
+            {% if snapshot_form.non_field_errors %}
+              <div class="alert alert-danger">{{ snapshot_form.non_field_errors }}</div>
+            {% endif %}
+            <div class="mb-3">
+              <label class="form-label">Group</label>
+              {{ snapshot_form.group }}
+              {{ snapshot_form.group.errors }}
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Reporting period</label>
+              {{ snapshot_form.period }}
+              {{ snapshot_form.period.errors }}
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Meeting (optional)</label>
+              {{ snapshot_form.meeting }}
+              {{ snapshot_form.meeting.errors }}
+              <div class="form-text">
+                Linking to a meeting locks the snapshot once the meeting is approved.
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Reason (optional)</label>
+              {{ snapshot_form.reason }}
+              {{ snapshot_form.reason.errors }}
+            </div>
+          </div>
+          <div class="card-footer text-end">
+            <button class="btn btn-primary btn-sm" type="submit">
+              <i class="bi bi-camera me-1"></i> Create snapshot
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">
+          <strong>{% if period %}{{ period.name }} summary{% else %}No period selected{% endif %}</strong>
+        </div>
+        <div class="card-body">
+          {% if period and overall %}
+            <div class="row g-3 mb-3">
+              <div class="col-6">
+                <div class="label text-muted mb-1">Revenue</div>
+                <div class="fw-bold fs-5">{% currency_cell overall.revenue_target period.currency %}</div>
+                <div class="small">
+                  Actual: {% currency_cell overall.revenue_actual period.currency %}
+                  <span class="d-block">{{ overall.revenue_pct|percentage }} achieved
+                    <span class="{{ overall.revenue_deficit|negative_class }}">
+                      ({% currency_cell overall.revenue_deficit period.currency signed=True %})
+                    </span>
+                  </span>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="label text-muted mb-1">Profit</div>
+                <div class="fw-bold fs-5">{% currency_cell overall.profit_target period.currency %}</div>
+                <div class="small">
+                  Actual: {% currency_cell overall.profit_actual period.currency %}
+                  <span class="d-block">{{ overall.profit_pct|percentage }} achieved
+                    <span class="{{ overall.profit_deficit|negative_class }}">
+                      ({% currency_cell overall.profit_deficit period.currency signed=True %})
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <div class="text-muted small mb-1">Margin target</div>
+                <div class="fw-semibold">{{ overall.margin_pct_target|percentage }}</div>
+              </div>
+              <div class="col-md-4">
+                <div class="text-muted small mb-1">Margin actual</div>
+                <div class="fw-semibold">{{ overall.margin_pct_actual|percentage }}</div>
+              </div>
+              <div class="col-md-4">
+                <div class="text-muted small mb-1">Deliveries on-time</div>
+                <div class="fw-semibold">{{ overall.on_time_pct|percentage }}</div>
+              </div>
+            </div>
+          {% else %}
+            <div class="text-muted py-5 text-center">
+              <i class="bi bi-journal-text d-block display-5 mb-2"></i>
+              Create a reporting period to see data here.
+            </div>
+          {% endif %}
+        </div>
+        {% if can_export and period %}
+          <div class="card-footer text-end">
+            <a class="btn btn-sm btn-success" href="{% url 'sales_updates:export_excel_period' period.pk %}">
+              <i class="bi bi-file-earmark-excel me-1"></i> Download Excel workbook
+            </a>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-header"><strong>What's included in the Excel export?</strong></div>
+        <div class="card-body small">
+          <ul class="mb-0 small">
+            <li>One row per sales group: revenue, profit, margin, orders, deliveries, on-time %.
+            </li>
+            <li>Summary row with aggregated totals across teams.</li>
+            <li>Notes tab: period cut-off, currency, generation timestamp, operator.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

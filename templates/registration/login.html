@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Sign In{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-center min-vh-100 py-4 px-3">
+    <div class="w-100" style="max-width: 420px;">
+        <div class="text-center mb-4">
+            <div class="d-inline-flex align-items-center justify-content-center rounded-3 bg-primary text-white p-3 mb-3 shadow-sm">
+                <i class="bi bi-journal-text fs-1"></i>
+            </div>
+            <h1 class="h3 fw-bold mb-1">MIMOM Intranet</h1>
+            <p class="text-muted small mb-0">Management Meeting Minutes &amp; Action Tracking</p>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-semibold mb-3">Sign in to your account</h2>
+
+                {% if form.errors %}
+                    <div class="alert alert-danger d-flex align-items-center gap-2 mb-4" role="alert">
+                        <i class="bi bi-exclamation-circle-fill"></i>
+                        <div class="small">
+                            Your username and password didn't match. Please try again.
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if next %}
+                    {% if user.is_authenticated %}
+                        <div class="alert alert-warning d-flex align-items-center gap-2 mb-4" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            <div class="small">
+                                Your account doesn't have access to this page.
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info d-flex align-items-center gap-2 mb-4" role="alert">
+                            <i class="bi bi-info-circle-fill"></i>
+                            <div class="small">Please sign in to see this page.</div>
+                        </div>
+                    {% endif %}
+                {% endif %}
+
+                <form method="post" action="{% url 'login' %}" class="needs-validation" novalidate>
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="id_username" class="form-label small fw-medium text-body-secondary">
+                            Username
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white">
+                                <i class="bi bi-person text-muted"></i>
+                            </span>
+                            <input type="text" name="username" id="id_username"
+                                class="form-control" autofocus autocomplete="username" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_password" class="form-label small fw-medium text-body-secondary">
+                            Password
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white">
+                                <i class="bi bi-lock text-muted"></i>
+                            </span>
+                            <input type="password" name="password" id="id_password"
+                                class="form-control" autocomplete="current-password" required>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div class="form-check small">
+                            <input type="checkbox" class="form-check-input" id="id_remember">
+                            <label class="form-check-label text-muted" for="id_remember">
+                                Remember me
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary fw-medium">
+                            <i class="bi bi-box-arrow-in-right me-2"></i> Sign In
+                        </button>
+                    </div>
+
+                    <input type="hidden" name="next" value="{{ next|default:'' }}">
+                </form>
+            </div>
+        </div>
+
+        <div class="text-center mt-4 small text-muted">
+            <p class="mb-0">
+                <i class="bi bi-shield-lock me-1"></i>
+                Authorized users only. All activity is monitored and logged.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

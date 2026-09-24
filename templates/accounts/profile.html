@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+{% load permissions %}
+{% block content %}
+<div class="row">
+    <div class="col-lg-4 mb-4 mb-lg-0">
+        <div class="card border-0 shadow-sm sticky-top" style="top: 1rem;">
+            <div class="card-body text-center py-4">
+                <div class="d-flex align-items-center justify-content-center rounded-circle bg-primary text-white fw-bold shadow-sm mx-auto mb-3" style="width: 88px; height: 88px; font-size: 1.7rem;">
+                    {{ profile_user.get_initials }}
+                </div>
+                <h3 class="h5 fw-bold mb-1">{{ profile_user.get_display_name }}</h3>
+                <p class="text-muted small mb-0">@{{ profile_user.username }}</p>
+                <p class="text-muted small mb-3">
+                    <a href="mailto:{{ profile_user.email }}" class="text-decoration-none text-primary">{{ profile_user.email }}</a>
+                </p>
+
+                <div class="d-flex flex-wrap justify-content-center gap-1 mb-3">
+                {% if profile_user.is_active %}
+                    <span class="badge rounded-pill bg-success-subtle text-success small">Active</span>
+                {% else %}
+                    <span class="badge rounded-pill bg-secondary-subtle text-secondary small">Inactive</span>
+                {% endif %}
+                {% for role in role_groups %}
+                    <span class="badge rounded-pill bg-secondary-subtle text-body-secondary small">{{ role.name }}</span>
+                {% empty %}
+                    <span class="badge rounded-pill bg-light text-body-secondary small">No roles assigned</span>
+                {% endfor %}
+                </div>
+
+                {% if role_groups %}
+                <div class="text-start small mb-3">
+                    <div class="fw-medium text-body-secondary mb-1">Roles</div>
+                    <ul class="list-unstyled mb-0">
+                    {% for role in role_groups %}
+                        <li class="d-flex align-items-center gap-2 py-1">
+                            <i class="bi bi-shield-check text-primary"></i>
+                            <span>{{ role.name }}</span>
+                        </li>
+                    {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if profile_user.phone %}
+                <div class="text-start small mb-3">
+                    <div class="fw-medium text-body-secondary mb-1">Phone</div>
+                    <span>{{ profile_user.phone }}</span>
+                </div>
+                {% endif %}
+
+                <div class="d-flex flex-column gap-2 mt-3">
+                    {% if is_self %}
+                        <a href="{% url 'accounts:profile_edit' %}" class="btn btn-primary btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-2">
+                            <i class="bi bi-pencil"></i> Edit My Profile
+                        </a>
+                        <a href="{% url 'accounts:password_change' %}" class="btn btn-outline-secondary btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-2">
+                            <i class="bi bi-key"></i> Change Password
+                        </a>
+                    {% endif %}
+                    {% can_manage_users_tag as can_edit %}
+                    {% if can_edit and not is_self %}
+                        <a href="{% url 'accounts:user_edit' profile_user.pk %}" class="btn btn-primary btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-2">
+                            <i class="bi bi-person-gear"></i> Edit User
+                        </a>
+                        <a href="{% url 'accounts:department_assignments' profile_user.pk %}" class="btn btn-outline-info btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-2">
+                            <i class="bi bi-diagram-3"></i> Department Assignments
+                        </a>
+                    {% endif %}
+                    {% can_manage_department_assignments_tag as can_assign %}
+                    {% if can_assign and is_self and not can_edit %}
+                        <a href="{% url 'accounts:department_assignments' profile_user.pk %}" class="btn btn-outline-info btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-2">
+                            <i class="bi bi-diagram-3"></i> My Assignments
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        {% if profile_user.bio %}
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom py-3">
+                <h3 class="h6 fw-semibold mb-0">About</h3>
+            </div>
+            <div class="card-body py-3">
+                <p class="mb-0">{{ profile_user.bio|linebreaksbr }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h3 class="h6 fw-semibold mb-0">Department Memberships</h3>
+                {% can_manage_department_assignments_tag as can_assign %}
+                {% if can_assign %}
+                <a href="{% url 'accounts:department_assignments' profile_user.pk %}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-pencil me-1"></i> Edit
+                </a>
+                {% endif %}
+            </div>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead class="bg-white border-bottom">
+                        <tr>
+                            <th class="small text-uppercase fw-semibold text-body-secondary ps-3">Department</th>
+                            <th class="small text-uppercase fw-semibold text-body-secondary">Position</th>
+                            <th class="small text-uppercase fw-semibold text-body-secondary">Role</th>
+                            <th class="small text-uppercase fw-semibold text-body-secondary">Status</th>
+                            <th class="small text-uppercase fw-semibold text-body-secondary pe-3">Since</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in memberships %}
+                        <tr class="border-bottom">
+                            <td class="ps-3 py-3">
+                                <span class="fw-semibold">{{ m.department.name }}</span>
+                            </td>
+                            <td class="py-3">{{ m.position.name|default:'—' }}</td>
+                            <td class="py-3">
+                                <div class="d-flex flex-wrap gap-1">
+                                    {% if m.is_primary %}
+                                        <span class="badge rounded-pill bg-primary-subtle text-primary small">Primary</span>
+                                    {% endif %}
+                                    {% if m.is_contributor %}
+                                        <span class="badge rounded-pill bg-info-subtle text-info small">Contributor</span>
+                                    {% endif %}
+                                    {% if not m.is_primary and not m.is_contributor %}
+                                        <span class="text-muted small">Member</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="py-3">
+                                {% if m.is_active %}
+                                    <span class="badge rounded-pill bg-success-subtle text-success small">Active</span>
+                                {% else %}
+                                    <span class="badge rounded-pill bg-secondary-subtle text-secondary small">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 pe-3">{{ m.date_joined|date:'M d, Y'|default:'—' }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5">
+                                {% include 'components/empty_state.html' with icon='diagram-3' title='No department assignments' message='Department assignments track organizational membership and can be edited by user managers.' %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h3 class="h6 fw-semibold mb-0">Management Teams / Working Groups</h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead class="bg-white border-bottom">
+                        <tr>
+                            <th class="small text-uppercase fw-semibold text-body-secondary ps-3">Team</th>
+                            <th class="small text-uppercase fw-semibold text-body-secondary">Role in Team</th>
+                            <th class="small text-uppercase fw-semibold text-body-secondary">Status</th>
+                            <th class="small text-uppercase fw-semibold text-body-secondary pe-3">Since</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in team_memberships %}
+                        <tr class="border-bottom">
+                            <td class="ps-3 py-3 fw-semibold">{{ t.team.name }}</td>
+                            <td class="py-3">{{ t.role|default:'Member' }}</td>
+                            <td class="py-3">
+                                {% if t.is_active %}
+                                    <span class="badge rounded-pill bg-success-subtle text-success small">Active</span>
+                                {% else %}
+                                    <span class="badge rounded-pill bg-secondary-subtle text-secondary small">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 pe-3">{{ t.date_joined|date:'M d, Y'|default:'—' }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4">
+                                {% include 'components/empty_state.html' with icon='people' title='Not a member of any management team' %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

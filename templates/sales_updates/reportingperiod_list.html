@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% load permissions %}
+{% load sales_formatting %}
+
+{% block title %}Reporting Periods{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row mb-4 align-items-end">
+    <div class="col">
+      <h1 class="h3 mb-1">Reporting Periods</h1>
+      <div class="text-muted small">
+        {% if current_period %}
+          <span class="badge bg-success me-2">Open: {{ current_period.name }}</span>
+          Cut-off: <strong>{{ current_period.cut_off_date|date:"SHORT_DATE_FORMAT" }}</strong>
+          <span class="ms-2">({{ current_period.days_until_cutoff }} days remaining)</span>
+        {% else %}
+          No open reporting period.
+        {% endif %}
+      </div>
+    </div>
+    <div class="col-auto">
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'sales_updates:group_dashboard' %}">
+        <i class="bi bi-grid-3x3-gap me-1"></i> Performance Dashboard
+      </a>
+      {% load permissions %}{% can_edit_sales_period_tag as can_edit_sales %}
+      {% if can_edit_sales %}
+        <a class="btn btn-primary btn-sm" href="{% url 'sales_updates:period_create' %}">
+          <i class="bi bi-plus-circle me-1"></i> New Period
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Name</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Cut-off</th>
+            <th>Weeks</th>
+            <th>Status</th>
+            <th>Currency</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for period in periods %}
+            <tr>
+              <td>
+                <a href="{% url 'sales_updates:group_dashboard_period' period.pk %}">
+                  <strong>{{ period.name }}</strong>
+                </a>
+              </td>
+              <td>{{ period.start_date|date:"SHORT_DATE_FORMAT" }}</td>
+              <td>{{ period.end_date|date:"SHORT_DATE_FORMAT" }}</td>
+              <td>
+                <span class="{% if period.days_until_cutoff < 0 %}text-danger{% elif period.days_until_cutoff <= 3 %}text-warning{% else %}text-muted{% endif %}">
+                  {{ period.cut_off_date|date:"SHORT_DATE_FORMAT" }}
+                  <small class="d-block">
+                  {% if period.days_until_cutoff < 0 %}
+                    Overdue {{ period.days_until_cutoff|stringformat:"d"|slice:"1:" }} days
+                  {% else %}
+                      {{ period.days_until_cutoff }} days left
+                    {% endif %}
+                </small>
+              </td>
+              <td>{{ period.weeks_count }}</td>
+              <td>
+                {% if period.status == "OPEN" %}
+                  <span class="badge bg-success">Open</span>
+                {% elif period.status == "CLOSED" %}
+                  <span class="badge bg-secondary">Closed</span>
+                {% else %}
+                  <span class="badge bg-light text-dark">Draft</span>
+                {% endif %}
+              </td>
+              <td>{{ period.get_currency_display }}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-secondary"
+                   href="{% url 'sales_updates:period_update' period.pk %}">Edit</a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="8" class="text-center py-5 text-muted">No reporting periods yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

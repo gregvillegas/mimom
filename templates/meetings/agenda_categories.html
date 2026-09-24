@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %}Agenda Categories{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap gap-2 justify-content-between align-items-end mb-3">
+    <div>
+      <h1 class="h3 mb-1">Agenda categories</h1>
+      <div class="text-muted small">Define reusable buckets such as "Old Business", "Action Item Review", or "Reports".</div>
+    </div>
+  </div>
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Order</th>
+                  <th>Name</th>
+                  <th>Scope</th>
+                  <th>Active</th>
+                  <th class="text-end"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for c in categories %}
+                  <tr>
+                    <td class="text-muted font-monospace">{{ c.order }}</td>
+                    <td>
+                      <strong>{{ c.name }}</strong>
+                      {% if c.description %}<div class="small text-muted">{{ c.description }}</div>{% endif %}
+                    </td>
+                    <td>{% if c.scope_department %}{{ c.scope_department.name }}{% else %}<span class="text-muted">Global</span>{% endif %}</td>
+                    <td>{% if c.is_active %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-x-circle text-secondary"></i>{% endif %}</td>
+                    <td class="text-end">
+                      <a class="btn btn-sm btn-outline-primary" href="{% url 'meetings:agenda_category_update' c.pk %}">Edit</a>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="5" class="text-center text-muted py-4">No categories yet — create one on the right.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <h2 class="h6 mb-0">Create a category</h2>
+        </div>
+        <form method="post" action="{% url 'meetings:agenda_category_create' %}" class="card-body" novalidate>
+          {% csrf_token %}
+          {{ new_form.as_p }}
+          <div class="text-end">
+            <button class="btn btn-sm btn-primary">Create category</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,242 @@
+{% extends 'base.html' %}
+{% load permissions %}
+
+{% block title %}Action Items{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row mb-3 align-items-end">
+    <div class="col">
+      <h1 class="h3 mb-1">{{ heading|default:"Action Items" }}</h1>
+      <div class="text-muted small">
+        {% if badge %}<span class="badge bg-secondary me-2">{{ badge }}</span>{% endif %}
+        Track, filter, and update assigned work items and their progress.
+      </div>
+    </div>
+    <div class="col-auto">
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'action_items:actionitem_overdue' %}">
+        <i class="bi bi-exclamation-triangle me-1"></i> Overdue
+      </a>
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'action_items:actionitem_my' %}">
+        <i class="bi bi-person-check me-1"></i> My Assignments
+      </a>
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'action_items:actionitem_department' %}">
+        <i class="bi bi-diagram-3 me-1"></i> Department
+      </a>
+      {% if can_create %}
+        <a class="btn btn-primary btn-sm" href="{% url 'action_items:actionitem_create' %}">
+          <i class="bi bi-plus-circle me-1"></i> New Action Item
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header">
+      <ul class="nav nav-tabs card-header-tabs flex-nowrap overflow-x-auto mb-2" role="tablist">
+        <li class="nav-item">
+          <a class="nav-link active" href="{% url 'action_items:actionitem_list' %}">All Items</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'action_items:actionitem_my' %}">My Assignments</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'action_items:actionitem_department' %}">Department</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'action_items:actionitem_overdue' %}">Overdue</a>
+        </li>
+      </ul>
+      <form class="d-flex flex-wrap gap-2 align-items-end" method="get" action="">
+        <div class="col-auto">
+          <label class="visually-hidden" for="id_q">Search</label>
+          <input type="search" name="q" value="{{ request.GET.q }}" id="id_q" class="form-control form-control-sm" placeholder="Search title / description">
+        </div>
+        <div class="col-auto">
+          <label class="visually-hidden" for="id_status">Status</label>
+          <select class="form-select form-select-sm" id="id_status" name="status">
+            <option value="">Any status</option>
+            {% for val, label in status_choices %}
+              <option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-auto">
+          <label class="visually-hidden" for="id_priority">Priority</label>
+          <select class="form-select form-select-sm" id="id_priority" name="priority">
+            <option value="">Any priority</option>
+            {% for val, label in priority_choices %}
+              <option value="{{ val }}" {% if request.GET.priority == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-auto">
+          <label class="visually-hidden" for="id_department">Department</label>
+          <select class="form-select form-select-sm" id="id_department" name="department">
+            <option value="">Any department</option>
+            {% for d in departments %}
+              <option value="{{ d.pk }}" {% if request.GET.department == d.pk|stringformat:"s" %}selected{% endif %}>{{ d.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-auto">
+          <label class="visually-hidden" for="id_due_from">Due from</label>
+          <input type="date" name="due_from" value="{{ request.GET.due_from }}" id="id_due_from" class="form-control form-control-sm" placeholder="Due from">
+        </div>
+        <div class="col-auto">
+          <label class="visually-hidden" for="id_due_to">Due to</label>
+          <input type="date" name="due_to" value="{{ request.GET.due_to }}" id="id_due_to" class="form-control form-control-sm" placeholder="Due to">
+        </div>
+        <div class="col-auto">
+          <button class="btn btn-sm btn-outline-primary">Filter</button>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'action_items:actionitem_list' %}">Clear</a>
+        </div>
+      </form>
+    </div>
+
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th><input type="checkbox" id="cf-select-all" class="form-check-input"></th>
+              <th>Reference</th>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Progress</th>
+              <th>Due</th>
+              <th>Owner</th>
+              <th>Department</th>
+              <th class="text-end"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in actions %}
+              <tr class="{% if a.is_overdue %}table-warning{% endif %}">
+                <td><input type="checkbox" class="form-check-input cf-item" value="{{ a.pk }}"></td>
+                <td class="font-monospace small"><a href="{% url 'action_items:actionitem_detail' a.pk %}">{{ a.reference }}</a></td>
+                <td><a href="{% url 'action_items:actionitem_detail' a.pk %}" class="text-decoration-none text-body">{{ a.title }}</a></td>
+                <td>
+                  {% with action=a %}
+                    {% include 'action_items/_partials/status_badges.html' %}
+                  {% endwith %}
+                </td>
+                <td>
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="progress flex-grow-1" style="min-width:60px;height:10px;">
+                      <div class="progress-bar {% if a.progress_pct >= 100 %}bg-success{% elif a.progress_pct >= 50 %}bg-primary{% else %}bg-secondary{% endif %}" role="progressbar" style="width: {{ a.progress_pct }}%;"></div>
+                    </div>
+                    <span class="small text-muted">{{ a.progress_pct }}%</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="small">{{ a.due_date|date:"M d, Y" }}</span>
+                  {% if a.is_overdue %}<div class="small text-danger fw-medium">{{ a.overdue_age_days }} days overdue</div>{% endif %}
+                </td>
+                <td>{% if a.owner %}{{ a.owner.get_display_name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                <td>{% if a.department %}{{ a.department.name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-outline-primary" href="{% url 'action_items:actionitem_detail' a.pk %}">Open</a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="9" class="text-center py-4 text-muted">No action items found for current filters.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% if actions %}
+      <div class="card-footer d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+          <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#carryForwardModal">
+            <i class="bi bi-arrow-right-circle me-1"></i> Carry Forward Selected
+          </button>
+          <span class="small text-muted ms-2"><span id="cf-selected-count">0</span> selected</span>
+        </div>
+        {% if is_paginated %}
+          <nav aria-label="Action item pagination">
+            <ul class="pagination pagination-sm mb-0 justify-content-center">
+              {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if filter_applied %}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}{% endif %}">Previous</a></li>
+              {% endif %}
+              <li class="page-item active"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+              {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if filter_applied %}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}{% endif %}">Next</a></li>
+              {% endif %}
+            </ul>
+          </nav>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="modal fade" id="carryForwardModal" tabindex="-1" aria-labelledby="carryForwardModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'action_items:actionitem_carry_forward' %}" id="cf-form">
+        {% csrf_token %}
+        <input type="hidden" name="item_ids" id="cf-item-ids">
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="carryForwardModalLabel">Carry Forward Selected Items</h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">Duplicates are prevented automatically. COMPLETED and CANCELLED items are skipped by default.</p>
+          <div class="mb-3">
+            <label class="form-label">Target meeting (optional)</label>
+            <select class="form-select" name="target_meeting">
+              <option value="">—</option>
+            </select>
+            <div class="form-text">Attach the copied items to a future meeting for review.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-check">
+              <input type="checkbox" class="form-check-input" name="include_completed">
+              <span class="form-check-label">Also carry COMPLETED items</span>
+            </label>
+            <label class="form-check">
+              <input type="checkbox" class="form-check-input" name="include_cancelled">
+              <span class="form-check-label">Also carry CANCELLED items</span>
+            </label>
+          </div>
+          <div class="mb-0">
+            <label class="form-label">Reason (optional)</label>
+            <textarea class="form-control" name="reason" rows="2" placeholder="Why are these items being carried?"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="cf-submit">Carry Forward</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const allBox = document.getElementById('cf-select-all');
+    const items = document.querySelectorAll('.cf-item');
+    const count = document.getElementById('cf-selected-count');
+    const idsField = document.getElementById('cf-item-ids');
+    const submit = document.getElementById('cf-submit');
+    function update() {
+      const checked = Array.from(items).filter(i => i.checked);
+      count.textContent = checked.length;
+      idsField.value = checked.map(i => i.value).join(',');
+      submit.disabled = checked.length === 0;
+    }
+    if (allBox) allBox.addEventListener('change', function () {
+      items.forEach(i => i.checked = allBox.checked);
+      update();
+    });
+    items.forEach(i => i.addEventListener('change', update));
+    update();
+  });
+</script>
+{% endblock %}

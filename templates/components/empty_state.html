@@ -1,0 +1,25 @@
+<div class="d-flex flex-column align-items-center justify-content-center py-8 text-center empty-state">
+    {% if icon %}
+        <i class="bi bi-{{ icon }} fs-1 text-muted opacity-50 mb-3"></i>
+    {% else %}
+        <i class="bi bi-inbox fs-1 text-muted opacity-50 mb-3"></i>
+    {% endif %}
+
+    {% if title %}
+        <h5 class="text-body-secondary mb-2">{{ title }}</h5>
+    {% else %}
+        <h5 class="text-body-secondary mb-2">Nothing here yet</h5>
+    {% endif %}
+
+    {% if message %}
+        <p class="text-muted small mb-4 max-w-480px">{{ message }}</p>
+    {% else %}
+        <p class="text-muted small mb-4">Records will appear here once they are added.</p>
+    {% endif %}
+
+    {% if action_url and action_label %}
+        <a href="{{ action_url }}" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-2">
+            <i class="bi bi-plus-lg"></i> {{ action_label }}
+        </a>
+    {% endif %}
+</div>

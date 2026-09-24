@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% load permissions %}
+
+{% block title %}{% if object %}Edit{% else %}New{% endif %} Sales Group{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-2 small">
+      <li class="breadcrumb-item"><a href="{% url 'sales_updates:group_list' %}">Sales Groups</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{% if object %}Edit · {{ object.name }}{% else %}New Group{% endif %}</li>
+    </ol>
+  </nav>
+  <form method="post" class="row g-4">
+    {% csrf_token %}
+    <div class="col-lg-8">
+      <div class="card shadow-sm mb-4">
+        <div class="card-header"><strong>{% if object %}Edit{% else %}Create{% endif %} Sales Group</strong></div>
+        <div class="card-body">
+          {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <label class="form-label">Code</label>
+              {{ form.code }}
+              {{ form.code.errors }}
+            </div>
+            <div class="col-md-8">
+              <label class="form-label">Group name</label>
+              {{ form.name }}
+              {{ form.name.errors }}
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Team</label>
+              {{ form.team }}
+              {{ form.team.errors }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Manager</label>
+              {{ form.manager }}
+              {{ form.manager.errors }}
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Description</label>
+            {{ form.description }}
+            {{ form.description.errors }}
+          </div>
+          <div>
+            <label class="form-check">
+              {{ form.is_active }} <span class="form-check-label">Active</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {% if object %}
+        <div class="card shadow-sm mb-4">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>Memberships</strong>
+          </div>
+          <div class="card-body">
+            {{ membership_formset.management_form }}
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>User</th><th>Role</th><th>Joined</th><th>Left</th><th>Active</th><th>Delete</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for f in membership_formset %}
+                    <tr>
+                      <td>
+                        {{ f.id }}{{ f.user }}{{ f.user.errors }}
+                      </td>
+                      <td>{{ f.role }}{{ f.role.errors }}</td>
+                      <td>{{ f.joined_on }}{{ f.joined_on.errors }}</td>
+                      <td>{{ f.left_on }}{{ f.left_on.errors }}</td>
+                      <td class="text-center">{{ f.is_active }}</td>
+                      <td class="text-center">{{ f.DELETE }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="d-flex justify-content-between">
+        <a class="btn btn-outline-secondary" href="{% url 'sales_updates:group_list' %}">Cancel</a>
+        <button type="submit" class="btn btn-primary">{% if object %}Save changes{% else %}Create group{% endif %}</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

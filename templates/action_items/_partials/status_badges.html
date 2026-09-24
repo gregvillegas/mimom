@@ -1,0 +1,26 @@
+{% if action.status == 'OPEN' %}
+  <span class="badge bg-secondary text-white">Open</span>
+{% elif action.status == 'IN_PROGRESS' %}
+  <span class="badge bg-primary text-white">In Progress</span>
+{% elif action.status == 'BLOCKED' %}
+  <span class="badge bg-danger text-white">Blocked</span>
+{% elif action.status == 'UNDER_REVIEW' %}
+  <span class="badge bg-info text-white">Under Review</span>
+{% elif action.status == 'COMPLETED' %}
+  <span class="badge bg-success text-white">Completed</span>
+{% elif action.status == 'CANCELLED' %}
+  <span class="badge bg-secondary-subtle text-secondary border border-secondary">Cancelled</span>
+{% elif action.status == 'REOPENED' %}
+  <span class="badge bg-warning text-dark">Reopened</span>
+{% else %}
+  <span class="badge bg-light text-dark">{{ action.get_status_display }}</span>
+{% endif %}
+{% if action.priority == 'URGENT' %}
+  <span class="badge bg-danger-subtle text-danger border border-danger ms-1">Urgent</span>
+{% elif action.priority == 'HIGH' %}
+  <span class="badge bg-warning-subtle text-dark border border-warning ms-1">High</span>
+{% elif action.priority == 'MEDIUM' %}
+  <span class="badge bg-info-subtle text-dark border border-info ms-1">Med</span>
+{% else %}
+  <span class="badge bg-light text-muted border ms-1">Low</span>
+{% endif %}

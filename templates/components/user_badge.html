@@ -1,0 +1,19 @@
+{% load static %}{% load permissions %}
+{% if user and user.is_authenticated %}
+<div class="d-inline-flex align-items-center gap-2 user-badge">
+    <span class="d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 text-primary fw-semibold" style="width: 32px; height: 32px; font-size: 0.8rem;">
+        {{ user.get_initials }}
+    </span>
+    <div class="d-flex flex-column">
+        <span class="fw-semibold text-body small lh-sm">{{ user.get_display_name }}</span>
+        {% if user.get_primary_department %}
+            <span class="text-muted small lh-sm">{{ user.get_primary_department.name }}</span>
+        {% else %}
+            <span class="text-muted small lh-sm">{{ user.email }}</span>
+        {% endif %}
+    </div>
+    {% if show_status and not user.is_active %}
+        <span class="badge rounded-pill bg-secondary-subtle text-secondary ms-1">Inactive</span>
+    {% endif %}
+</div>
+{% endif %}

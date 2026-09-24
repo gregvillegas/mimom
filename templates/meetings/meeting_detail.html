@@ -1,0 +1,444 @@
+{% extends 'base.html' %}
+{% load permissions %}
+
+{% block title %}{{ meeting.title }}{% endblock %}
+
+{% block content %}
+{% load static %}
+<div class="container-fluid py-4">
+  <div class="d-sm-flex flex-wrap align-items-sm-end gap-2 justify-content-between mb-3">
+    <div>
+      <div class="d-flex gap-2 align-items-center mb-1">
+        <span class="text-muted small font-monospace">{{ meeting.reference }}</span>
+        {% include 'meetings/_partials/status_badges.html' %}
+        {% if meeting.is_locked %}<span class="badge bg-dark"><i class="bi bi-lock-fill"></i> Locked</span>{% endif %}
+      </div>
+      <h1 class="h2 mb-0">{{ meeting.title }}</h1>
+      <div class="text-muted small">
+        {% if meeting.start_at %}
+          <i class="bi bi-calendar3 me-1"></i>{{ meeting.start_at|date:"M d, Y H:i" }}
+          {% if meeting.end_at %} – {{ meeting.end_at|date:"H:i" }}{% endif %}
+        {% endif %}
+        {% if meeting.location %}
+          &nbsp;· <i class="bi bi-geo-alt me-1"></i>{{ meeting.location }}
+        {% endif %}
+        {% if meeting.department %}
+          &nbsp;· <i class="bi bi-diagram-3 me-1"></i>{{ meeting.department.name }}
+        {% endif %}
+        {% if meeting.chair %}
+          &nbsp;· Chaired by {{ meeting.chair.get_display_name }}
+        {% endif %}
+      </div>
+    </div>
+    <div class="btn-group flex-wrap" role="group">
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'meetings:meeting_list' %}">
+        <i class="bi bi-arrow-left me-1"></i> All Meetings
+      </a>
+      {% if can_edit %}
+        <a class="btn btn-outline-primary btn-sm" href="{% url 'meetings:meeting_update' meeting.pk %}">
+          <i class="bi bi-pencil me-1"></i> Edit
+        </a>
+      {% endif %}
+      {% if can_transition and available_target_statuses %}
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#transitionModal">
+          <i class="bi bi-signpost-split me-1"></i> Change Status
+        </button>
+      {% endif %}
+      {% if can_edit %}
+        <a class="btn btn-outline-info btn-sm" href="{% url 'meetings:meeting_attendance' meeting.pk %}">
+          <i class="bi bi-people me-1"></i> Attendance
+        </a>
+      {% endif %}
+      {% if can_archive and meeting.status != 'ARCHIVED' %}
+        <form method="post" action="{% url 'meetings:meeting_archive' meeting.pk %}" class="d-inline" onsubmit="return confirm('Archive this meeting? Approved/Published cannot be edited afterward.');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-archive me-1"></i> Archive
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="card mb-4 shadow-sm">
+        <div class="card-header">
+          <ul class="nav nav-tabs card-header-tabs flex-nowrap overflow-x-auto" role="tablist" id="detailTabs">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-summary" type="button">Summary</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-agenda" type="button">Agenda ({{ meeting.agenda_items.all|length }})</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-attendance" type="button">Attendance</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-attachments" type="button">Attachments</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-history" type="button">History</button></li>
+          </ul>
+        </div>
+        <div class="card-body tab-content">
+          <div class="tab-pane fade show active" id="tab-summary">
+            {% if meeting.description %}
+              <div class="mb-3">
+                <div class="small text-muted fw-semibold mb-1">Description</div>
+                <p class="mb-0 whitespace-pre-wrap">{{ meeting.description }}</p>
+              </div>
+            {% endif %}
+            {% if meeting.notes %}
+              <div class="mb-3">
+                <div class="small text-muted fw-semibold mb-1">Notes</div>
+                <p class="mb-0 whitespace-pre-wrap">{{ meeting.notes }}</p>
+              </div>
+            {% endif %}
+            <div class="row g-3">
+              <div class="col-12 col-sm-6 col-md-4 small">
+                <div class="text-muted">Meeting Type</div><div class="fw-medium">{{ meeting.type.name }}</div>
+              </div>
+              <div class="col-12 col-sm-6 col-md-4 small">
+                <div class="text-muted">Duration</div><div class="fw-medium">
+                  {% if meeting.duration_minutes %}
+                    {{ meeting.duration_minutes }} min
+                  {% else %}—{% endif %}
+                </div>
+              </div>
+              <div class="col-12 col-sm-6 col-md-4 small">
+                <div class="text-muted">Created by</div>
+                <div class="fw-medium">{% if meeting.created_by %}{{ meeting.created_by.get_display_name }}{% else %}—{% endif %}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="tab-agenda">
+            <div id="agenda" class="d-flex flex-wrap gap-2 justify-content-between align-items-end mb-3 border-bottom pb-3">
+              <h3 class="h5 mb-0">Agenda items</h3>
+              <div class="d-flex flex-wrap gap-2">
+                {% if can_edit %}
+                  <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#carryForwardModal">
+                    <i class="bi bi-arrow-repeat me-1"></i> Carry forward
+                  </button>
+                  <a class="btn btn-sm btn-primary" href="{% url 'meetings:agenda_item_create' meeting.pk %}">
+                    <i class="bi bi-plus me-1"></i> Add item
+                  </a>
+                {% endif %}
+                {% if carry_forward_candidates and can_edit %}
+                {% endif %}
+              </div>
+            </div>
+            <form id="agendaReorderForm" method="post" action="{% url 'meetings:agenda_item_order' meeting.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="item_order" id="item_order_input">
+            </form>
+            <ol class="list-group list-group-numbered" id="agendaOrderList">
+              {% for item in meeting.agenda_items.all %}
+                {% if item.is_confidential and not can_view_confidential %}
+                  <li class="list-group-item d-flex align-items-start gap-3" data-pk="{{ item.pk }}">
+                    <div class="fw-medium text-muted">
+                      <i class="bi bi-shield-lock me-1"></i>
+                      [Confidential]
+                    </div>
+                    <span class="small text-muted mt-1">Ask the meeting chair or an administrator for access.</span>
+                  </li>
+                {% else %}
+                  <li class="list-group-item d-flex flex-column flex-md-row gap-3 align-items-start" data-pk="{{ item.pk }}">
+                    <div class="flex-grow-1 d-flex flex-column gap-1">
+                      <div class="d-flex flex-wrap align-items-center gap-2">
+                        {% if item.category %}<span class="badge bg-light text-dark border border-light">{{ item.category.name }}</span>{% endif %}
+                        {% if item.is_confidential %}<span class="badge bg-danger-subtle text-danger border border-danger-subtle"><i class="bi bi-shield-lock-fill"></i> Confidential</span>{% endif %}
+                        <span class="badge bg-secondary-subtle text-secondary">{{ item.get_item_status_display }}</span>
+                        {% if item.department %}<span class="small text-muted">{{ item.department.name }}</span>{% endif %}
+                      </div>
+                      <div class="fw-medium">
+                        <a class="text-decoration-none text-body" href="{% url 'meetings:agenda_item_update' item.pk %}">
+                          #{{ item.order }} {{ item.title }}
+                        </a>
+                      </div>
+                      {% if item.owner %}<div class="small text-muted">Owner: {{ item.owner.get_display_name }}</div>{% endif %}
+                      {% if item.discussion %}
+                        <details class="mt-1">
+                          <summary class="small text-muted fw-semibold cursor-pointer">Discussion</summary>
+                          <p class="small mt-2 mb-0 whitespace-pre-wrap">{{ item.discussion }}</p>
+                        </details>
+                      {% endif %}
+                      {% if item.decision %}
+                        <details>
+                          <summary class="small text-success fw-semibold cursor-pointer">Decision</summary>
+                          <p class="small mt-2 mb-0 whitespace-pre-wrap">{{ item.decision }}</p>
+                        </details>
+                      {% endif %}
+                      {% if item.attachments.all %}
+                        <div class="small mt-1">
+                          <span class="text-muted me-2">Attachments:</span>
+                          {% for att in item.attachments.all %}
+                            {% if att.is_confidential and not can_view_confidential %}
+                              <span class="badge bg-secondary-subtle text-secondary me-1">[Confidential]</span>
+                            {% else %}
+                              <a class="badge bg-info-subtle text-info-emphasis text-decoration-none me-1" href="{{ att.file.url }}">
+                                <i class="bi bi-paperclip me-1"></i>{{ att.display_name|default:att.file.name }}
+                              </a>
+                            {% endif %}
+                          {% endfor %}
+                        </div>
+                      {% endif %}
+                    </div>
+                    {% if can_edit %}
+                      <div class="d-flex flex-column gap-1 ms-md-auto">
+                        <button class="btn btn-sm btn-outline-secondary agenda-move-up" type="button" aria-label="Move up"><i class="bi bi-chevron-up"></i></button>
+                        <button class="btn btn-sm btn-outline-secondary agenda-move-down" type="button" aria-label="Move down"><i class="bi bi-chevron-down"></i></button>
+                        <a class="btn btn-sm btn-outline-primary" href="{% url 'meetings:agenda_item_update' item.pk %}"><i class="bi bi-pencil"></i></a>
+                        <form method="post" action="{% url 'meetings:agenda_item_delete' item.pk %}" onsubmit="return confirm('Delete this agenda item?');" class="d-inline">
+                          {% csrf_token %}
+                          <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                        </form>
+                      </div>
+                    {% endif %}
+                  </li>
+                {% endif %}
+              {% empty %}
+                <li class="list-group-item text-muted text-center py-4">No agenda items yet.</li>
+              {% endfor %}
+            </ol>
+            {% if can_edit and meeting.agenda_items.all|length > 1 %}
+              <div class="mt-3 text-end">
+                <button type="button" id="saveAgendaOrderBtn" class="btn btn-sm btn-outline-primary">Save agenda order</button>
+              </div>
+            {% endif %}
+
+            <h3 class="h6 mt-4 mb-2">Attach files to an agenda item</h3>
+            {% if can_edit %}
+              <p class="small text-muted mb-2">Upload an agenda attachment after selecting the item in the item editor, or use the direct endpoint.</p>
+            {% endif %}
+          </div>
+
+          <div class="tab-pane fade" id="tab-attendance">
+            {% if can_edit %}
+              <div class="mb-3 text-end">
+                <a class="btn btn-sm btn-primary" href="{% url 'meetings:meeting_attendance' meeting.pk %}">Manage attendance</a>
+              </div>
+            {% endif %}
+            <div class="table-responsive">
+              <table class="table table-sm align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>Person</th>
+                    <th>Invited</th>
+                    <th>Attended</th>
+                    <th>RSVP</th>
+                    <th>Arrived</th>
+                    <th>Departed</th>
+                    <th>Role / Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for a in meeting.attendance.all %}
+                    <tr>
+                      <td>{{ a.user.get_display_name }}</td>
+                      <td>{% if a.is_invited %}<i class="bi bi-check-circle text-success"></i>{% else %}—{% endif %}</td>
+                      <td>{% if a.is_attended %}<i class="bi bi-check-circle text-success"></i>{% else %}—{% endif %}</td>
+                      <td><span class="badge bg-light text-dark">{{ a.get_rsvp_status_display }}</span></td>
+                      <td class="small">{% if a.arrived_at %}{{ a.arrived_at|date:"M d H:i" }}{% else %}—{% endif %}</td>
+                      <td class="small">{% if a.departed_at %}{{ a.departed_at|date:"M d H:i" }}{% else %}—{% endif %}</td>
+                      <td class="small">
+                        {% if a.role_at_meeting %}<div class="fw-medium">{{ a.role_at_meeting }}</div>{% endif %}
+                        {% if a.notes %}<div class="text-muted">{{ a.notes }}</div>{% endif %}
+                      </td>
+                    </tr>
+                  {% empty %}
+                    <tr><td colspan="7" class="text-muted text-center py-3">No attendance rows yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="tab-pane fade" id="tab-attachments">
+            {% if can_edit %}
+              <div class="card card-body bg-light border mb-3">
+                <h4 class="h6 mb-2">Upload meeting attachment</h4>
+                <form method="post" action="{% url 'meetings:meeting_attachment_upload' meeting.pk %}" enctype="multipart/form-data">
+                  {% csrf_token %}
+                  <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-6">
+                      <label class="form-label small">File</label>
+                      <input type="file" class="form-control form-control-sm" name="file" required>
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label class="form-label small">Display name</label>
+                      <input type="text" class="form-control form-control-sm" name="display_name" placeholder="Optional">
+                    </div>
+                    <div class="col-12 col-md-2">
+                      <label class="form-check form-switch form-check-inline mt-3">
+                        <input type="checkbox" class="form-check-input" name="is_confidential" id="conf-attach">
+                        <label class="form-check-label small" for="conf-attach">Confidential</label>
+                      </label>
+                    </div>
+                    <div class="col-12 text-end">
+                      <button class="btn btn-sm btn-primary">Upload</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            {% endif %}
+            <ul class="list-group">
+              {% for att in meeting.attachments.all %}
+                {% if att.is_confidential and not can_view_confidential %}
+                  <li class="list-group-item text-muted">
+                    <i class="bi bi-shield-lock me-1"></i>[Confidential attachment]
+                  </li>
+                {% else %}
+                  <li class="list-group-item d-flex gap-3 align-items-center">
+                    <i class="bi bi-paperclip text-secondary fs-5"></i>
+                    <div class="flex-grow-1">
+                      <a class="fw-medium text-decoration-none" href="{{ att.file.url }}">{{ att.display_name|default:att.file.name }}</a>
+                      <div class="small text-muted">
+                        Uploaded {% if att.uploaded_by %}by {{ att.uploaded_by.get_display_name }} {% endif %}on {{ att.created_at|date:"M d, Y" }}
+                        {% if att.is_confidential %} · <span class="badge bg-danger-subtle text-danger">Confidential</span>{% endif %}
+                        {% if att.description %} · <span class="text-muted">{{ att.description }}</span>{% endif %}
+                      </div>
+                    </div>
+                    {% if can_edit %}
+                      <form method="post" action="{% url 'meetings:meeting_attachment_delete' att.pk %}" onsubmit="return confirm('Delete this attachment?');" class="d-inline">
+                        {% csrf_token %}
+                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                      </form>
+                    {% endif %}
+                  </li>
+                {% endif %}
+              {% empty %}
+                <li class="list-group-item text-muted text-center py-3">No attachments yet.</li>
+              {% endfor %}
+            </ul>
+          </div>
+
+          <div class="tab-pane fade" id="tab-history">
+            <ol class="list-group list-group-flush">
+              {% for h in meeting.status_history.all %}
+                <li class="list-group-item d-flex flex-column gap-1">
+                  <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <span class="badge bg-light text-dark">{{ h.from_status|default:'—' }}</span>
+                    <i class="bi bi-arrow-right text-muted"></i>
+                    <span class="badge bg-secondary">{{ h.to_status }}</span>
+                    <span class="small text-muted ms-auto">
+                      {{ h.transitioned_at|date:"M d, Y H:i" }}
+                      {% if h.transitioned_by %} · by {{ h.transitioned_by.get_display_name }}{% endif %}
+                    </span>
+                  </div>
+                  {% if h.reason %}
+                    <div class="small text-muted bg-light rounded p-2 mt-1 whitespace-pre-wrap">{{ h.reason }}</div>
+                  {% endif %}
+                </li>
+              {% empty %}
+                <li class="list-group-item text-muted text-center py-3">No transitions yet.</li>
+              {% endfor %}
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="col-lg-4">
+      <div class="card mb-4 shadow-sm">
+        <div class="card-header">
+          <h3 class="h6 mb-0">Quick actions</h3>
+        </div>
+        <ul class="list-group list-group-flush">
+          {% if can_edit %}
+            <li class="list-group-item"><a class="text-decoration-none" href="{% url 'meetings:meeting_update' meeting.pk %}"><i class="bi bi-pencil me-1"></i> Edit meeting details</a></li>
+            <li class="list-group-item"><a class="text-decoration-none" href="{% url 'meetings:agenda_item_create' meeting.pk %}"><i class="bi bi-plus-circle me-1"></i> Add agenda item</a></li>
+            <li class="list-group-item"><a class="text-decoration-none" href="{% url 'meetings:meeting_attendance' meeting.pk %}"><i class="bi bi-people me-1"></i> Manage attendance</a></li>
+          {% endif %}
+          <li class="list-group-item"><a class="text-decoration-none" href="{% url 'meetings:meeting_list' %}"><i class="bi bi-calendar-event me-1"></i> All meetings</a></li>
+        </ul>
+      </div>
+      {% if can_edit and carry_forward_candidates %}
+        <div class="card shadow-sm">
+          <div class="card-header">
+            <h3 class="h6 mb-0">Carry forward from another meeting</h3>
+          </div>
+          <div class="card-body">
+            <form method="post" action="{% url 'meetings:meeting_carry_forward' meeting.pk %}">
+              {% csrf_token %}
+              <div class="mb-3">
+                <label class="form-label small">Source meeting (Draft)</label>
+                <select class="form-select form-select-sm" name="source_meeting">
+                  {% for s in carry_forward_candidates %}
+                    <option value="{{ s.pk }}">{{ s.reference }} — {{ s.title }}</option>
+                  {% empty %}
+                    <option disabled>No other draft meetings available.</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label small">Comma-separated agenda item PKs</label>
+                <input type="text" class="form-control form-control-sm" name="item_ids" placeholder="e.g. 123e4567-e89b-...">
+              </div>
+              <button class="btn btn-sm btn-outline-primary w-100">Carry forward</button>
+            </form>
+          </div>
+        </div>
+      {% endif %}
+    </aside>
+  </div>
+</div>
+
+{% include 'meetings/_partials/transition_modal.html' %}
+
+<div class="modal fade" id="carryForwardModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Carry forward items into this meeting</h5>
+        <button class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'meetings:meeting_carry_forward' meeting.pk %}" class="modal-body">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label">Source meeting</label>
+          <select name="source_meeting" class="form-select form-select-sm" required>
+            {% for s in carry_forward_candidates %}
+              <option value="{{ s.pk }}">{{ s.reference }} — {{ s.title }}</option>
+            {% empty %}
+              <option disabled selected>No other draft meetings available.</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Agenda item IDs (comma separated)</label>
+          <textarea name="item_ids" rows="2" class="form-control" placeholder="UUID or PKs, comma separated"></textarea>
+          <div class="form-text">Tip: open the source meeting detail and copy the UUIDs of items you wish to carry forward.</div>
+        </div>
+        <div class="d-flex justify-content-end gap-2">
+          <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-sm btn-primary">Carry forward</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% if can_edit and meeting.agenda_items.all|length > 1 %}
+<script>
+(function() {
+  const list = document.getElementById('agendaOrderList');
+  const saveBtn = document.getElementById('saveAgendaOrderBtn');
+  const input = document.getElementById('item_order_input');
+  function serialize() {
+    const pks = [];
+    list.querySelectorAll('li[data-pk]').forEach(li => pks.push(li.dataset.pk));
+    input.value = pks.join(',');
+  }
+  function move(li, dir) {
+    if (dir < 0 && li.previousElementSibling) li.parentNode.insertBefore(li, li.previousElementSibling);
+    if (dir > 0 && li.nextElementSibling) li.parentNode.insertBefore(li.nextElementSibling, li);
+  }
+  list.addEventListener('click', (ev) => {
+    const target = ev.target.closest('button');
+    if (!target) return;
+    const li = target.closest('li[data-pk]');
+    if (!li) return;
+    if (target.classList.contains('agenda-move-up')) move(li, -1);
+    else if (target.classList.contains('agenda-move-down')) move(li, 1);
+  });
+  saveBtn && saveBtn.addEventListener('click', () => {
+    serialize();
+    document.getElementById('agendaReorderForm').submit();
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

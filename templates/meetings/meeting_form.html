@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if object and object.pk %}Edit{% else %}New{% endif %} Meeting{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="mb-3">
+    <a class="btn btn-sm btn-outline-secondary" href="{% if object and object.pk %}{% url 'meetings:meeting_detail' object.pk %}{% else %}{% url 'meetings:meeting_list' %}{% endif %}">
+      <i class="bi bi-arrow-left me-1"></i> Back
+    </a>
+  </div>
+  <div class="card shadow-sm">
+    <div class="card-header">
+      <h1 class="h4 mb-0">{% if object and object.pk %}Edit meeting{% else %}Create a new meeting{% endif %}</h1>
+    </div>
+    <div class="card-body">
+      {% if object and object.pk and not object.is_editable %}
+        <div class="alert alert-warning mb-3">
+          <i class="bi bi-lock-fill me-1"></i>
+          This meeting is <strong>{{ object.get_status_display }}</strong>. Core fields cannot be edited.
+          Request a System or Management Administrator to <em>Return for Correction</em> if changes are required.
+        </div>
+      {% endif %}
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {% if form.errors %}
+          <div class="alert alert-danger mb-3">
+            <div class="fw-semibold mb-1">Please correct the errors below:</div>
+            <ul class="mb-0">
+              {% for field, errors in form.errors.items %}
+                {% for err in errors %}
+                  <li><strong>{{ field|capfirst }}:</strong> {{ err }}</li>
+                {% endfor %}
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+
+        <fieldset class="mb-4">
+          <legend class="small text-uppercase fw-semibold text-muted mb-2">Core details</legend>
+          <div class="row g-3">
+            <div class="col-12 col-md-6">
+              <label class="form-label">Type</label>
+              {{ form.type }}
+              {% if form.type.help_text %}<div class="form-text">{{ form.type.help_text }}</div>{% endif %}
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">Chair</label>
+              {{ form.chair }}
+            </div>
+            <div class="col-12">
+              <label class="form-label">Title</label>
+              {{ form.title }}
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Start (local)</label>
+              {{ form.start_at }}
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">End (local)</label>
+              {{ form.end_at }}
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Location</label>
+              {{ form.location }}
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">Department scope (optional)</label>
+              {{ form.department }}
+            </div>
+            <div class="col-12 col-md-6 d-flex align-items-center">
+              <label class="form-check form-switch mt-4">
+                {{ form.is_locked }}
+                <span class="form-check-label">Lock draft (only admins may edit / transition)</span>
+              </label>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="mb-4">
+          <legend class="small text-uppercase fw-semibold text-muted mb-2">Description and notes</legend>
+          <div class="mb-3">
+            <label class="form-label">Description</label>
+            {{ form.description }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Notes</label>
+            {{ form.notes }}
+          </div>
+        </fieldset>
+
+        <div class="d-flex justify-content-end gap-2 flex-wrap">
+          <a class="btn btn-outline-secondary" href="{% if object and object.pk %}{% url 'meetings:meeting_detail' object.pk %}{% else %}{% url 'meetings:meeting_list' %}{% endif %}">Cancel</a>
+          <button type="submit" class="btn btn-primary">
+            {% if object and object.pk %}Save changes{% else %}Create meeting{% endif %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

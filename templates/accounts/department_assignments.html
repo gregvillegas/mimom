@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-4 d-flex align-items-center gap-3">
+                <span class="d-flex align-items-center justify-content-center rounded-circle bg-primary text-white fw-bold shadow-sm" style="width: 56px; height: 56px; font-size: 1.1rem;">
+                    {{ target_user.get_initials }}
+                </span>
+                <div class="flex-grow-1">
+                    <div class="fw-semibold h5 mb-0">{{ target_user.get_display_name }}</div>
+                    <div class="text-muted small">{{ target_user.email }} · @{{ target_user.username }}</div>
+                </div>
+                <a href="{% url 'accounts:profile_detail' target_user.pk %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-person me-1"></i> View Profile
+                </a>
+                <a href="{% url 'accounts:user_edit' target_user.pk %}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-person-gear me-1"></i> User Details
+                </a>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <h2 class="h6 fw-semibold mb-0">Department Assignments</h2>
+                <div class="form-text small">
+                    Users may be assigned to more than one department.
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    {{ formset.management_form }}
+
+                    {% if formset.non_form_errors %}
+                        <div class="alert alert-danger">
+                            {% for err in formset.non_form_errors %}{{ err }}<br>{% endfor %}
+                        </div>
+                    {% endif %}
+
+                    {% if not target_user.is_active %}
+                        <div class="alert alert-warning d-flex align-items-center gap-2" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            <div>
+                                This user account is <strong>inactive</strong>. New or existing assignments cannot be marked as active until the user account is re-activated.
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <div class="table-responsive mb-3">
+                        <table class="table align-middle mb-0">
+                            <thead class="bg-white border-bottom">
+                                <tr>
+                                    <th class="small text-uppercase fw-semibold text-body-secondary">Department</th>
+                                    <th class="small text-uppercase fw-semibold text-body-secondary">Position</th>
+                                    <th class="small text-uppercase fw-semibold text-body-secondary">Primary</th>
+                                    <th class="small text-uppercase fw-semibold text-body-secondary">Contributor</th>
+                                    <th class="small text-uppercase fw-semibold text-body-secondary">Active</th>
+                                    <th class="small text-uppercase fw-semibold text-body-secondary">Since</th>
+                                    <th class="small text-uppercase fw-semibold text-body-secondary">Delete</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for form in formset %}
+                                <tr class="border-bottom align-middle">
+                                    {{ form.id }}
+                                    {% if form.non_field_errors %}
+                                        <td colspan="7">
+                                            <div class="text-danger small">{{ form.non_field_errors }}</div>
+                                        </td>
+                                    {% endif %}
+                                    <td class="py-2">
+                                        <select name="{{ form.department.html_name }}" id="{{ form.department.id_for_label }}" class="form-select form-select-sm">
+                                            <option value="">— Select —</option>
+                                            {% for choice in form.department.field.choices %}
+                                                <option value="{{ choice.0 }}" {% if choice.0|stringformat:'s' == form.department.value|stringformat:'s' %}selected{% endif %}>{{ choice.1 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        {% if form.department.errors %}<div class="text-danger small">{{ form.department.errors }}</div>{% endif %}
+                                    </td>
+                                    <td class="py-2">
+                                        <select name="{{ form.position.html_name }}" id="{{ form.position.id_for_label }}" class="form-select form-select-sm">
+                                            <option value="">—</option>
+                                            {% for choice in form.position.field.choices %}
+                                                <option value="{{ choice.0 }}" {% if choice.0|stringformat:'s' == form.position.value|stringformat:'s' %}selected{% endif %}>{{ choice.1 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td class="py-2 text-center">
+                                        <input type="checkbox" name="{{ form.is_primary.html_name }}" id="{{ form.is_primary.id_for_label }}" class="form-check-input" {% if form.is_primary.value %}checked{% endif %}>
+                                    </td>
+                                    <td class="py-2 text-center">
+                                        <input type="checkbox" name="{{ form.is_contributor.html_name }}" id="{{ form.is_contributor.id_for_label }}" class="form-check-input" {% if form.is_contributor.value %}checked{% endif %}>
+                                    </td>
+                                    <td class="py-2 text-center">
+                                        <input type="checkbox" name="{{ form.is_active.html_name }}" id="{{ form.is_active.id_for_label }}" class="form-check-input" {% if form.is_active.value %}checked{% endif %}>
+                                    </td>
+                                    <td class="py-2">
+                                        <input type="date" name="{{ form.date_joined.html_name }}" id="{{ form.date_joined.id_for_label }}" class="form-control form-control-sm" value="{{ form.date_joined.value|default:'' }}">
+                                    </td>
+                                    <td class="py-2 text-center">
+                                        {% if form.instance.pk %}
+                                        <input type="checkbox" name="{{ form.DELETE.html_name }}" id="{{ form.DELETE.id_for_label }}" class="form-check-input">
+                                        {% else %}
+                                        <span class="text-muted small">new</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% if form.notes.field %}
+                                <tr>
+                                    <td colspan="7" class="pt-0 border-0">
+                                        <textarea name="{{ form.notes.html_name }}" id="{{ form.notes.id_for_label }}" rows="2" class="form-control form-control-sm" placeholder="Notes (optional)">{{ form.notes.value|default:'' }}</textarea>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                        <a href="{% url 'accounts:profile_detail' target_user.pk %}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2">
+                            <i class="bi bi-check2-square"></i> Save Assignments
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

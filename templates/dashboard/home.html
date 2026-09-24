@@ -1,0 +1,402 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load permissions %}
+{% load sales_formatting %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+    <div>
+        <h1 class="h3 fw-bold mb-1">Good to see you, {{ user.get_display_name }}.</h1>
+        <p class="text-muted mb-0">Here's an overview of management meeting activity.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        {% can_create_meeting_tag as can_create_meeting %}
+        <a href="{% url 'meetings:meeting_list' %}" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2">
+            <i class="bi bi-calendar-event"></i> All Meetings
+        </a>
+        {% if can_create_meeting %}
+            <a href="{% url 'meetings:meeting_create' %}" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-2">
+                <i class="bi bi-plus-lg"></i> New Meeting
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-primary bg-opacity-10 p-2">
+                        <i class="bi bi-calendar-event text-primary fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-primary-subtle text-primary small">Scheduled</span>
+                </div>
+                <div class="h2 fw-bold mb-1">{{ meeting_total|default:0 }}</div>
+                <div class="small text-muted">Total Meetings</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-warning bg-opacity-10 p-2">
+                        <i class="bi bi-list-check text-warning fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-warning-subtle text-warning small">Draft</span>
+                </div>
+                <div class="h2 fw-bold mb-1">{{ meeting_counts.DRAFT|default:0 }}</div>
+                <div class="small text-muted">Drafts / Open</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-info bg-opacity-10 p-2">
+                        <i class="bi bi-clock-history text-info fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-info-subtle text-info small">For Review</span>
+                </div>
+                <div class="h2 fw-bold mb-1">{{ meeting_counts.FOR_REVIEW|default:0 }}</div>
+                <div class="small text-muted">Minutes Awaiting Review</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-success bg-opacity-10 p-2">
+                        <i class="bi bi-file-earmark-check text-success fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-success-subtle text-success small">Published</span>
+                </div>
+                <div class="h2 fw-bold mb-1">{{ meeting_counts.PUBLISHED|default:0|add:meeting_counts.APPROVED|default:0 }}</div>
+                <div class="small text-muted">Approved / Published</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-primary bg-opacity-10 p-2">
+                        <i class="bi bi-check2-square text-primary fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-primary-subtle text-primary small">Open</span>
+                </div>
+                <div class="h2 fw-bold mb-1">{{ action_counts.total_open|default:0 }}</div>
+                <div class="small text-muted">Open Action Items</div>
+                <div class="mt-2">
+                    <a href="{% url 'action_items:actionitem_list' %}" class="btn btn-sm btn-outline-primary w-100">View all</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-info bg-opacity-10 p-2">
+                        <i class="bi bi-person-check text-info fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-info-subtle text-info small">Mine</span>
+                </div>
+                <div class="h2 fw-bold mb-1">{{ action_counts.assigned_me|default:0 }}</div>
+                <div class="small text-muted">Assigned to me</div>
+                <div class="mt-2">
+                    <a href="{% url 'action_items:actionitem_my' %}" class="btn btn-sm btn-outline-primary w-100">My Assignments</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-danger bg-opacity-10 p-2">
+                        <i class="bi bi-exclamation-triangle text-danger fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-danger-subtle text-danger small">Overdue</span>
+                </div>
+                <div class="h2 fw-bold mb-1">{{ action_counts.overdue|default:0 }}</div>
+                <div class="small text-muted">Overdue Action Items</div>
+                <div class="mt-2">
+                    <a href="{% url 'action_items:actionitem_overdue' %}" class="btn btn-sm btn-outline-danger w-100">Review overdue</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-success bg-opacity-10 p-2">
+                        <i class="bi bi-calendar2-week text-success fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-success-subtle text-success small">This Week</span>
+                </div>
+                <div class="h2 fw-bold mb-1">{{ action_counts.due_this_week|default:0 }}</div>
+                <div class="small text-muted">Due this week · completed: {{ action_counts.completed_this_week|default:0 }}</div>
+                <div class="mt-2">
+                    <a href="{% url 'action_items:actionitem_list' %}" class="btn btn-sm btn-outline-primary w-100">Filter list</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-primary bg-opacity-10 p-2">
+                        <i class="bi bi-currency-exchange text-primary fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-primary-subtle text-primary small">
+                        {% if sales_summary.current_period %}{{ sales_summary.current_period }}{% else %}No period{% endif %}
+                    </span>
+                </div>
+                <div class="h2 fw-bold mb-1">
+                    {% if sales_summary.revenue_actual %}
+                        {% currency_cell sales_summary.revenue_actual sales_summary.currency %}
+                    {% else %}0.00{% endif %}
+                </div>
+                <div class="small text-muted">Revenue actual</div>
+                <div class="mt-2 small">
+                    {% if sales_summary.revenue_pct %}
+                        {{ sales_summary.revenue_pct|percentage }} of target
+                    {% else %}
+                        No target set
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-info bg-opacity-10 p-2">
+                        <i class="bi bi-percent text-info fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-info-subtle text-info small">Margin</span>
+                </div>
+                <div class="h2 fw-bold mb-1">
+                    {% if sales_summary.profit_pct_actual %}{{ sales_summary.profit_pct_actual|percentage }}{% else %}0.00%{% endif %}
+                </div>
+                <div class="small text-muted">Current profit margin</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-danger bg-opacity-10 p-2">
+                        <i class="bi bi-arrow-down-right text-danger fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-danger-subtle text-danger small">Revenue Gap</span>
+                </div>
+                <div class="h2 fw-bold mb-1 {{ sales_summary.revenue_deficit|negative_class }}">
+                    {% if sales_summary.revenue_deficit is not None and sales_summary.revenue_deficit != 0 %}
+                        {% currency_cell sales_summary.revenue_deficit sales_summary.currency parens=True %}
+                    {% else %}
+                        {% currency_cell 0 sales_summary.currency %}
+                    {% endif %}
+                </div>
+                <div class="small text-muted">Revenue deficit (target vs actual)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-warning bg-opacity-10 p-2">
+                        <i class="bi bi-calendar-week text-warning fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-warning-subtle text-warning small">Weeks Left</span>
+                </div>
+                <div class="h2 fw-bold mb-1">
+                    {% if sales_summary.weeks_count %}{{ sales_summary.weeks_count }}{% else %}—{% endif %}
+                </div>
+                <div class="small text-muted">
+                    Weeks to cut-off
+                    {% if sales_summary.days_until_cutoff is not None %}
+                        ({{ sales_summary.days_until_cutoff }} days)
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h2 class="h6 fw-semibold mb-0">Upcoming Meetings</h2>
+                <a href="{% url 'meetings:meeting_list' %}" class="btn btn-sm btn-link text-decoration-none">View all</a>
+            </div>
+            <div class="card-body p-0 flex-grow-1">
+                {% if upcoming_meetings %}
+                    <div class="list-group list-group-flush">
+                        {% for m in upcoming_meetings %}
+                            <a href="{% url 'meetings:meeting_detail' m.pk %}" class="list-group-item list-group-item-action d-flex gap-3 align-items-center">
+                                <div class="flex-shrink-0 text-center" style="width: 64px;">
+                                    <div class="small text-muted text-uppercase fw-semibold">{{ m.start_at|date:"M" }}</div>
+                                    <div class="h3 fw-bold mb-0">{{ m.start_at|date:"d" }}</div>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                                        <span class="font-monospace small text-muted">{{ m.reference }}</span>
+                                        {% include 'meetings/_partials/status_badges.html' with meeting=m %}
+                                    </div>
+                                    <div class="fw-medium text-body">{{ m.title }}</div>
+                                    <div class="small text-muted">
+                                        {{ m.start_at|date:"H:i" }}{% if m.end_at %} – {{ m.end_at|date:"H:i" }}{% endif %}
+                                        {% if m.location %} · {{ m.location }}{% endif %}
+                                        {% if m.chair %} · Chaired by {{ m.chair.get_display_name }}{% endif %}
+                                    </div>
+                                </div>
+                                <i class="bi bi-chevron-right text-muted"></i>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="p-4">
+                        {% include 'components/empty_state.html' with icon='calendar-event' title='No upcoming meetings' message='Create a new management meeting to see it here. The next Monday meeting can be cloned from the previous week.' action_label='Create Meeting' action_url=meeting_create_url %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h2 class="h6 fw-semibold mb-0">Next 8 Overdue Actions</h2>
+                <a href="{% url 'action_items:actionitem_overdue' %}" class="btn btn-sm btn-link text-decoration-none">View all</a>
+            </div>
+            <div class="card-body p-0">
+                {% if action_overdue %}
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                                <tr><th>Ref</th><th>Title</th><th>Owner</th><th>Overdue</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for a in action_overdue %}
+                                    <tr>
+                                        <td class="font-monospace small"><a href="{% url 'action_items:actionitem_detail' a.pk %}">{{ a.reference }}</a></td>
+                                        <td><a href="{% url 'action_items:actionitem_detail' a.pk %}" class="text-decoration-none text-body">{{ a.title }}</a></td>
+                                        <td>{% if a.owner %}{{ a.owner.get_display_name }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                                        <td><span class="badge bg-warning text-dark">{{ a.overdue_age_days }}d</span></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="p-4">
+                        {% include 'components/empty_state.html' with icon='check-circle' title='No overdue actions' message='Good work — there are no action items currently past their deadline.' %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm h-100 mt-4">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h2 class="h6 fw-semibold mb-0">Current Period Cut-off</h2>
+                <a href="{% url 'sales_updates:group_dashboard' %}" class="btn btn-sm btn-link text-decoration-none">Open dashboard</a>
+            </div>
+            <div class="card-body">
+                {% if sales_summary.current_period %}
+                    <div class="row g-3 align-items-center">
+                        <div class="col-8">
+                            <div class="small text-muted mb-1">Period</div>
+                            <div class="fw-semibold fs-6">{{ sales_summary.current_period }}</div>
+                            <div class="small text-muted mt-2">
+                                Cut-off date:
+                                <strong>
+                                    {% if sales_summary.cut_off_date %}{{ sales_summary.cut_off_date }}{% else %}—{% endif %}
+                                </strong>
+                            </div>
+                        </div>
+                        <div class="col-4 text-end">
+                            <div class="small text-muted mb-1">Days remaining</div>
+                            <div class="h2 fw-bold mb-0 {% if sales_summary.days_until_cutoff is not None and sales_summary.days_until_cutoff < 0 %}text-danger{% elif sales_summary.days_until_cutoff is not None and sales_summary.days_until_cutoff <= 3 %}text-warning{% endif %}">
+                                {% if sales_summary.days_until_cutoff is not None %}
+                                    {{ sales_summary.days_until_cutoff }}
+                                {% else %}—{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="my-3">
+                    <div class="row g-3 small">
+                        <div class="col-6">
+                            <div class="text-muted">Revenue gap</div>
+                            <div class="fw-semibold {{ sales_summary.revenue_deficit|negative_class }}">
+                                {% if sales_summary.revenue_deficit is not None and sales_summary.revenue_deficit != 0 %}
+                                    {% currency_cell sales_summary.revenue_deficit sales_summary.currency signed=True %}
+                                {% else %}
+                                    {% currency_cell 0 sales_summary.currency %}
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-muted">Revenue achieved</div>
+                            <div class="fw-semibold">
+                                {% if sales_summary.revenue_pct %}
+                                    {{ sales_summary.revenue_pct|percentage }}
+                                {% else %}—{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% if sales_groups %}
+                        <hr class="my-3">
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead class="table-light">
+                                    <tr><th>Group</th><th class="text-end">% Target</th><th class="text-end">Gap</th></tr>
+                                </thead>
+                                <tbody>
+                                    {% for g in sales_groups %}
+                                        <tr>
+                                            <td>
+                                                <span class="small fw-medium">{{ g.group_name }}</span>
+                                                <small class="d-block text-muted">{{ g.group_code }}</small>
+                                            </td>
+                                            <td class="text-end fw-semibold">{{ g.pct|percentage }}</td>
+                                            <td class="text-end text-danger">{% currency_cell g.deficit sales_summary.currency parens=True %}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-3 text-muted">
+                        <i class="bi bi-calendar-x display-5 d-block mb-2"></i>
+                        No open reporting period.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

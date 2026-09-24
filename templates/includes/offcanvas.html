@@ -1,0 +1,134 @@
+<div class="offcanvas offcanvas-start d-md-none" tabindex="-1" id="sidebarOffcanvas" aria-labelledby="sidebarOffcanvasLabel">
+    <div class="offcanvas-header bg-primary text-white">
+        <h5 class="offcanvas-title d-flex align-items-center gap-2" id="sidebarOffcanvasLabel">
+            <i class="bi bi-journal-text fs-4"></i>
+            MIMOM Intranet
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+
+    <div class="offcanvas-body p-3">
+        <div class="px-2 mb-4 d-flex align-items-center gap-3">
+            <span class="d-flex align-items-center justify-content-center rounded-circle bg-primary text-white fw-semibold" style="width: 44px; height: 44px;">
+                {{ user.get_initials }}
+            </span>
+            <div>
+                <div class="fw-semibold">{{ user.get_display_name }}</div>
+                <div class="small text-muted">{{ user.email }}</div>
+            </div>
+        </div>
+
+        <nav class="nav flex-column gap-1">
+            <a href="{% url 'home' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 bg-light text-primary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-grid-1x2-fill"></i>
+                <span>Dashboard</span>
+            </a>
+
+            <div class="px-2 mt-4 mb-1 small text-uppercase fw-semibold text-muted">Meetings</div>
+            {% load permissions %}
+            {% can_create_meeting_tag as can_create_meeting %}
+            <a href="{% url 'meetings:meeting_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-calendar-event"></i>
+                <span>Meetings</span>
+            </a>
+            <a href="{% url 'meetings:meeting_list' %}?view=calendar" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-calendar3"></i>
+                <span>Calendar</span>
+            </a>
+            <a href="{% url 'meetings:agenda_category_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-list-check"></i>
+                <span>Agenda Categories</span>
+            </a>
+            {% if can_create_meeting %}
+            <a href="{% url 'meetings:meeting_create' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-plus-circle"></i>
+                <span>New Meeting</span>
+            </a>
+            {% endif %}
+
+            <div class="px-2 mt-4 mb-1 small text-uppercase fw-semibold text-muted">Actions</div>
+
+            <a href="{% url 'action_items:actionitem_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-check2-square"></i>
+                <span>All Action Items</span>
+            </a>
+            <a href="{% url 'action_items:actionitem_overdue' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-exclamation-circle"></i>
+                <span>Overdue Items</span>
+            </a>
+            <a href="{% url 'action_items:actionitem_my' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-person-check"></i>
+                <span>My Assignments</span>
+            </a>
+
+            <div class="px-2 mt-4 mb-1 small text-uppercase fw-semibold text-muted">Reports</div>
+
+            <a href="{% url 'sales_updates:group_dashboard' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-graph-up-arrow"></i>
+                <span>Sales Performance</span>
+            </a>
+            <a href="{% url 'sales_updates:period_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-calendar-week"></i>
+                <span>Reporting Periods</span>
+            </a>
+            <a href="{% url 'sales_updates:exports_page' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-file-earmark-arrow-down"></i>
+                <span>Reports & Exports</span>
+            </a>
+
+            {% load permissions %}
+            {% can_manage_users_tag as can_manage_users %}
+            {% can_manage_department_assignments_tag as can_assign_depts %}
+            {% if can_manage_users or can_assign_depts or user.is_staff %}
+            <div class="px-2 mt-4 mb-1 small text-uppercase fw-semibold text-muted">Organization</div>
+
+            {% if can_manage_users %}
+            <a href="{% url 'accounts:user_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-people"></i>
+                <span>Users</span>
+            </a>
+            {% endif %}
+            {% if can_assign_depts or can_manage_users %}
+            <a href="#" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-diagram-3"></i>
+                <span>Departments</span>
+            </a>
+            <a href="#" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-briefcase"></i>
+                <span>Positions</span>
+            </a>
+            <a href="#" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-person-badge"></i>
+                <span>Teams</span>
+            </a>
+            {% endif %}
+            {% endif %}
+
+            {% if user.is_staff or can_manage_users %}
+            <div class="px-2 mt-4 mb-1 small text-uppercase fw-semibold text-muted">Admin</div>
+
+            {% if can_manage_users %}
+            <a href="{% url 'accounts:user_create' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-person-plus"></i>
+                <span>New User</span>
+            </a>
+            {% endif %}
+            {% if user.is_staff %}
+            <a href="{% url 'admin:index' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary" data-bs-dismiss="offcanvas">
+                <i class="bi bi-tools"></i>
+                <span>System Admin</span>
+            </a>
+            {% endif %}
+            {% endif %}
+        </nav>
+    </div>
+
+    <div class="offcanvas-footer border-top p-3">
+        <form action="{% url 'logout' %}" method="post" class="m-0 d-grid">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger d-flex align-items-center justify-content-center gap-2">
+                <i class="bi bi-box-arrow-right"></i> Sign out
+            </button>
+        </form>
+    </div>
+</div>

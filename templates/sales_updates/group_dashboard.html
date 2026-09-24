@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% load permissions %}
+{% load sales_formatting %}
+
+{% block title %}Sales Performance Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row mb-4 align-items-end">
+    <div class="col">
+      <h1 class="h3 mb-1">
+        Sales Performance
+        {% if period %}
+          <small class="text-muted fs-6">· {{ period.name }}</small>
+        {% endif %}
+      </h1>
+      <div class="text-muted small">
+        {% if period %}
+          Cut-off: <strong>{{ period.cut_off_date|date:"SHORT_DATE_FORMAT" }}</strong>
+          · <span class="{% if period.days_until_cutoff < 0 %}text-danger{% elif period.days_until_cutoff <= 3 %}text-warning{% endif %}">
+            {% if period.days_until_cutoff < 0 %}Overdue{% else %}{{ period.days_until_cutoff }} days remaining{% endif %}
+          </span>
+        {% else %}
+          Select a reporting period to view performance.
+        {% endif %}
+      </div>
+    </div>
+    <div class="col-auto">
+      <div class="btn-group me-2" role="group">
+        {% for p in periods %}
+          <a class="btn btn-sm {% if p == period %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+             href="{% url 'sales_updates:group_dashboard_period' p.pk %}">{{ p.name }}</a>
+        {% endfor %}
+      </div>
+      {% if can_export and period %}
+        <a class="btn btn-outline-success btn-sm" href="{% url 'sales_updates:export_excel_period' period.pk %}">
+          <i class="bi bi-file-earmark-excel me-1"></i> Excel
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if overall %}
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="small text-muted">Revenue Target</div>
+            <div class="fs-5 fw-bold">
+              {% currency_cell overall.revenue_target period.currency %}
+            </div>
+            <div class="small mt-2 text-muted">Actual</div>
+            <div class="fs-6 fw-semibold">
+              {% currency_cell overall.revenue_actual period.currency %}
+            </div>
+            <div class="small mt-2">
+              <strong>{{ overall.revenue_pct|percentage }}</strong>
+              · Deficit
+              <span class="{{ overall.revenue_deficit|negative_class }}">
+                {% currency_cell overall.revenue_deficit period.currency signed=True %}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="small text-muted">Profit Target</div>
+            <div class="fs-5 fw-bold">
+              {% currency_cell overall.profit_target period.currency %}
+            </div>
+            <div class="small mt-2 text-muted">Actual</div>
+            <div class="fs-6 fw-semibold">
+              {% currency_cell overall.profit_actual period.currency %}
+            </div>
+            <div class="small mt-2">
+              <strong>{{ overall.profit_pct|percentage }}</strong>
+              · Deficit
+              <span class="{{ overall.profit_deficit|negative_class }}">
+                {% currency_cell overall.profit_deficit period.currency signed=True %}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="small text-muted">Margin</div>
+            <div class="fs-5 fw-bold">
+              {{ overall.margin_pct_actual|percentage }}
+              <span class="text-muted fs-6">target {{ overall.margin_pct_target|percentage }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="small text-muted">Cut-off countdown</div>
+            <div class="fs-5 fw-bold">{{ period.days_until_cutoff }} days</div>
+            <div class="small mt-2 text-muted">{{ period.cut_off_date|date:"DATE_FORMAT" }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% for team in teams_summary %}
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">
+          <strong>{{ team.team.code }} · {{ team.team.name }}</strong>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="sticky-col">Group</th>
+                  <th>Revenue Tgt</th><th>Revenue Act</th><th>Revenue %</th>
+                  <th>Profit Tgt</th><th>Profit Act</th><th>Profit %</th>
+                  <th>Margin Tgt</th><th>Margin Act</th>
+                  <th>Orders</th><th>Deliveries</th>
+                  <th>On-time %</th>
+                  <th class="text-end">Detail</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in team.rows %}
+                  <tr>
+                    <td class="sticky-col"><strong>{{ row.group.name }}</strong> <small class="text-muted d-block">{{ row.group.code }}</small></td>
+                    <td>{% currency_cell row.revenue_target period.currency %}</td>
+                    <td>{% currency_cell row.revenue_actual period.currency %}</td>
+                    <td class="fw-semibold">{{ row.revenue_pct|percentage }}</td>
+                    <td>{% currency_cell row.profit_target period.currency %}</td>
+                    <td>{% currency_cell row.profit_actual period.currency %}</td>
+                    <td class="fw-semibold">{{ row.profit_pct|percentage }}</td>
+                    <td>{{ row.margin_pct_target|percentage }}</td>
+                    <td>{{ row.margin_pct_actual|percentage }}</td>
+                    <td>{{ row.orders_actual }} / {{ row.orders_target }}</td>
+                    <td>{{ row.deliveries_achieved }} / {{ row.deliveries_target }}</td>
+                    <td>{{ row.on_time_pct|percentage }}</td>
+                    <td class="text-end">
+                      <a class="btn btn-sm btn-outline-secondary"
+                         href="{% url 'sales_updates:group_period_detail' row.group.pk period.pk %}">Open</a>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="13" class="text-center py-4 text-muted">No groups in this team.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-journal-x display-5 d-block mb-3"></i>
+      Select a reporting period above to see sales performance.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

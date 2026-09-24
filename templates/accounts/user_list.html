@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% load permissions %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+    <div>
+        <h1 class="h3 fw-bold mb-1">Users</h1>
+        <p class="text-muted small mb-0">Manage user accounts, roles, and department assignments.</p>
+    </div>
+    <a href="{% url 'accounts:user_create' %}" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-2">
+        <i class="bi bi-person-plus-fill"></i> Add User
+    </a>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-6">
+                <label class="form-label small fw-medium text-body-secondary">Search</label>
+                <input type="text" name="q" class="form-control" placeholder="Search by username, email, or name…" value="{{ query }}">
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-medium text-body-secondary">Status</label>
+                <select name="status" class="form-select">
+                    <option value="">All</option>
+                    <option value="active" {% if status == "active" %}selected{% endif %}>Active</option>
+                    <option value="inactive" {% if status == "inactive" %}selected{% endif %}>Inactive</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-outline-primary btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-search"></i> Filter
+                </button>
+                <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-x-lg"></i> Reset
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead class="bg-white border-bottom">
+                <tr>
+                    <th class="small text-uppercase fw-semibold text-body-secondary ps-3">User</th>
+                    <th class="small text-uppercase fw-semibold text-body-secondary">Primary Department</th>
+                    <th class="small text-uppercase fw-semibold text-body-secondary">Roles</th>
+                    <th class="small text-uppercase fw-semibold text-body-secondary">Status</th>
+                    <th class="small text-uppercase fw-semibold text-body-secondary pe-3 text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white">
+                {% for u in users %}
+                <tr class="border-bottom">
+                    <td class="ps-3 py-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 text-primary fw-semibold" style="width: 34px; height: 34px; font-size: 0.8rem;">
+                                {{ u.get_initials }}
+                            </span>
+                            <div class="d-flex flex-column">
+                                <a href="{% url 'accounts:profile_detail' u.pk %}" class="fw-semibold text-decoration-none">{{ u.get_display_name }}</a>
+                                <span class="small text-muted">{{ u.email }}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="py-3">
+                        {% with u.get_primary_department as dept %}
+                            {% if dept %}
+                                <span class="text-body">{{ dept.name }}</span>
+                            {% else %}
+                                <span class="text-muted small">—</span>
+                            {% endif %}
+                        {% endwith %}
+                    </td>
+                    <td class="py-3">
+                        <div class="d-flex flex-wrap gap-1">
+                        {% for grp in u.groups.all %}
+                            <span class="badge rounded-pill bg-secondary-subtle text-body-secondary small">{{ grp.name }}</span>
+                        {% empty %}
+                            <span class="text-muted small">—</span>
+                        {% endfor %}
+                        </div>
+                    </td>
+                    <td class="py-3">
+                        {% if u.is_active %}
+                            <span class="badge rounded-pill bg-success-subtle text-success small">Active</span>
+                        {% else %}
+                            <span class="badge rounded-pill bg-secondary-subtle text-secondary small">Inactive</span>
+                        {% endif %}
+                        {% if u.is_staff %}
+                            <span class="badge rounded-pill bg-primary-subtle text-primary small ms-1">Staff</span>
+                        {% endif %}
+                    </td>
+                    <td class="py-3 pe-3 text-end">
+                        <div class="d-inline-flex gap-1 justify-content-end">
+                            <a href="{% url 'accounts:profile_detail' u.pk %}" class="btn btn-sm btn-outline-secondary" title="View profile">
+                                <i class="bi bi-person"></i>
+                            </a>
+                            <a href="{% url 'accounts:user_edit' u.pk %}" class="btn btn-sm btn-outline-primary" title="Edit user">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'accounts:department_assignments' u.pk %}" class="btn btn-sm btn-outline-info" title="Department assignments">
+                                <i class="bi bi-diagram-3"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5">
+                        {% include 'components/empty_state.html' with icon='people' title='No users match your filters' message='Try adjusting the search terms or status filter.' %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if is_paginated %}
+    <div class="card-body border-top py-3">
+        <nav aria-label="Users pagination">
+            <ul class="pagination pagination-sm mb-0 justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if query %}&amp;q={{ query }}{% endif %}{% if status %}&amp;status={{ status }}{% endif %}">Previous</a></li>
+                {% endif %}
+                <li class="page-item active" aria-current="page">
+                    <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                </li>
+                {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if query %}&amp;q={{ query }}{% endif %}{% if status %}&amp;status={{ status }}{% endif %}">Next</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

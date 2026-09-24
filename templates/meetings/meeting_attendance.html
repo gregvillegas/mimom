@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% load permissions %}
+
+{% block title %}Attendance — {{ meeting.title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="mb-3">
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'meetings:meeting_detail' meeting.pk %}">
+      <i class="bi bi-arrow-left me-1"></i> Back to meeting
+    </a>
+  </div>
+  <div class="card shadow-sm">
+    <div class="card-header d-flex flex-wrap gap-2 justify-content-between align-items-center">
+      <div>
+        <h1 class="h4 mb-1">Manage attendance</h1>
+        <div class="text-muted small">
+          <span class="font-monospace">{{ meeting.reference }}</span> — {{ meeting.title }}
+        </div>
+      </div>
+      {% include 'meetings/_partials/status_badges.html' with meeting=meeting %}
+    </div>
+    <form method="post" class="card-body" novalidate>
+      {% csrf_token %}
+      {{ formset.management_form }}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>{{ formset.forms.0.user.label|default:'User' }}</th>
+              <th class="text-center">Invited</th>
+              <th class="text-center">Attended</th>
+              <th>RSVP</th>
+              <th>Arrived</th>
+              <th>Departed</th>
+              <th>Role at meeting</th>
+              <th>Notes</th>
+              <th class="text-center">Delete</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for form in formset %}
+              <tr>
+                {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+                <td>{{ form.user.errors }}{{ form.user }}</td>
+                <td class="text-center">{{ form.is_invited }}</td>
+                <td class="text-center">{{ form.is_attended }}</td>
+                <td>{{ form.rsvp_status.errors }}{{ form.rsvp_status }}</td>
+                <td>{{ form.arrived_at.errors }}{{ form.arrived_at }}</td>
+                <td>{{ form.departed_at.errors }}{{ form.departed_at }}</td>
+                <td>{{ form.role_at_meeting.errors }}{{ form.role_at_meeting }}</td>
+                <td>{{ form.notes.errors }}{{ form.notes }}</td>
+                <td class="text-center">{{ form.DELETE }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="9" class="text-muted text-center py-3">No rows yet — add a row below.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if formset.non_form_errors %}
+        <div class="alert alert-danger mb-3">
+          <ul class="mb-0">{% for err in formset.non_form_errors %}<li>{{ err }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="small text-muted">
+          Tip: Select a user plus check <strong>Invited</strong> to send an invitation. Mark <strong>Attended</strong> once the meeting is in progress.
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-secondary" href="{% url 'meetings:meeting_detail' meeting.pk %}">Cancel</a>
+          <button type="submit" class="btn btn-primary">Save attendance</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,348 @@
+{% extends 'base.html' %}
+{% load permissions %}
+{% load sales_formatting %}
+
+{% block title %}{{ group.name }} · {{ period.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-2 small">
+      <li class="breadcrumb-item"><a href="{% url 'sales_updates:period_list' %}">Periods</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'sales_updates:group_dashboard_period' period.pk %}">{{ period.name }}</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ group.name }}</li>
+    </ol>
+  </nav>
+
+  <div class="row mb-4 align-items-end">
+    <div class="col">
+      <h1 class="h3 mb-1">
+        {{ group.name }}
+        <small class="text-muted fs-6">· {{ period.name }}</small>
+      </h1>
+      <div class="text-muted small">
+        <span class="badge bg-light text-dark me-2">{{ group.code }}</span>
+        Team: <strong>{{ group.team.name }}</strong> · Manager:
+        {% if group.manager %}{{ group.manager.get_display_name }}{% else %}—{% endif %}
+        · Currency: <strong>{{ period.get_currency_display }}</strong>
+      </div>
+    </div>
+    <div class="col-auto">
+      <a class="btn btn-outline-secondary btn-sm"
+         href="{% url 'sales_updates:exports_page' %}">
+        <i class="bi bi-file-earmark-excel me-1"></i> Exports
+      </a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-header">
+      <ul class="nav nav-tabs card-header-tabs flex-nowrap overflow-x-auto mb-0" role="tablist">
+        <li class="nav-item">
+          <a class="nav-link active" data-bs-toggle="tab" href="#summary">Summary</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-bs-toggle="tab" href="#targets">Targets</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-bs-toggle="tab" href="#deliveries">Deliveries</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-bs-toggle="tab" href="#actuals">Sales Actuals</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-bs-toggle="tab" href="#charts">Charts</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" data-bs-toggle="tab" href="#snapshots">Snapshots</a>
+        </li>
+      </ul>
+    </div>
+
+    <div class="card-body">
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="summary">
+          <h5 class="mb-3">Period snapshot</h5>
+          <div class="row g-3 mb-3">
+            <div class="col-md-3">
+              <div class="card border-0 bg-light">
+                <div class="card-body">
+                  <div class="small text-muted">Revenue Target</div>
+                  <div class="fs-5 fw-bold">
+                    {% currency_cell subtotals.revenue_target period.currency %}
+                  </div>
+                  <div class="small text-muted mt-2">Actual</div>
+                  <div class="fs-6 fw-semibold">
+                    {% currency_cell subtotals.revenue_actual period.currency %}
+                  </div>
+                  <div class="mt-2 small">
+                    Achievement: <strong>{{ subtotals.revenue_pct|percentage }}</strong>
+                    · Deficit:
+                    <span class="{{ subtotals.revenue_deficit|negative_class }}">
+                      {% currency_cell subtotals.revenue_deficit period.currency signed=True %}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="card border-0 bg-light">
+                <div class="card-body">
+                  <div class="small text-muted">Profit Target</div>
+                  <div class="fs-5 fw-bold">
+                    {% currency_cell subtotals.profit_target period.currency %}
+                  </div>
+                  <div class="small text-muted mt-2">Actual</div>
+                  <div class="fs-6 fw-semibold">
+                    {% currency_cell subtotals.profit_actual period.currency %}
+                  </div>
+                  <div class="mt-2 small">
+                    Achievement: <strong>{{ subtotals.profit_pct|percentage }}</strong>
+                    · Deficit:
+                    <span class="{{ subtotals.profit_deficit|negative_class }}">
+                      {% currency_cell subtotals.profit_deficit period.currency signed=True %}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="card border-0 bg-light">
+                <div class="card-body">
+                  <div class="small text-muted">Margin Target</div>
+                  <div class="fs-5 fw-bold">{{ subtotals.margin_pct_target|percentage }}</div>
+                  <div class="small text-muted mt-2">Actual margin</div>
+                  <div class="fs-6 fw-semibold">{{ subtotals.margin_pct_actual|percentage }}</div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="card border-0 bg-light">
+                <div class="card-body">
+                  <div class="small text-muted">Deliveries</div>
+                  <div class="fs-5 fw-bold">
+                    {{ subtotals.deliveries_achieved }} / {{ subtotals.deliveries_target }}
+                  </div>
+                  <div class="small mt-2">On-time: <strong>{{ subtotals.on_time_pct|percentage }}</strong></div>
+                  <div class="small text-muted mt-2">Orders: {{ subtotals.orders_actual }} / {{ subtotals.orders_target }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="targets">
+          {% with form_target=target %}
+            <form method="post"
+                  action="{% url 'sales_updates:target_upsert' group.pk period.pk %}">
+              {% csrf_token %}
+              <div class="card border mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <strong>Performance targets</strong>
+                  {% if can_edit %}
+                    <button class="btn btn-primary btn-sm" type="submit">Save targets</button>
+                  {% endif %}
+                </div>
+                <div class="card-body">
+                  {% with tf=target_form %}
+                    <input type="hidden" name="group" value="{{ group.pk }}">
+                    <input type="hidden" name="period" value="{{ period.pk }}">
+                    <div class="row g-3">
+                      <div class="col-md-6">
+                        <label class="form-label">Revenue target</label>
+                        <input type="number" name="revenue_target" step="0.01"
+                               class="form-control"
+                               value="{{ form_target.revenue_target|default:'0.00' }}">
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label">Profit target</label>
+                        <input type="number" name="profit_target" step="0.01"
+                               class="form-control"
+                               value="{{ form_target.profit_target|default:'0.00' }}">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label">Orders target</label>
+                        <input type="number" name="orders_target" class="form-control"
+                               value="{{ form_target.orders_target|default:'0' }}">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label">Deliveries target</label>
+                        <input type="number" name="deliveries_target" class="form-control"
+                               value="{{ form_target.deliveries_target|default:'0' }}">
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label">Currency</label>
+                        <select name="currency" class="form-select">
+                          {% for value,label in currencies %}
+                            <option value="{{ value }}"
+                                    {% if form_target.currency == value or period.currency == value %}selected{% endif %}>
+                              {{ label }}
+                            </option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                    </div>
+                  {% endwith %}
+                </div>
+              </div>
+            </form>
+          {% endwith %}
+        </div>
+
+        <div class="tab-pane fade" id="deliveries">
+          <form method="post"
+                action="{% url 'sales_updates:delivery_upsert' group.pk period.pk %}">
+            {% csrf_token %}
+            <div class="card border mb-3">
+              <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Delivery performance</strong>
+                {% if can_edit %}
+                  <button class="btn btn-primary btn-sm" type="submit">Save deliveries</button>
+                {% endif %}
+              </div>
+              <div class="card-body">
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label class="form-label">Planned deliveries</label>
+                    <input type="number" name="deliveries_planned" class="form-control"
+                           value="{{ delivery.deliveries_planned|default:'0' }}">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Achieved deliveries</label>
+                    <input type="number" name="deliveries_achieved" class="form-control"
+                           value="{{ delivery.deliveries_achieved|default:'0' }}">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">On-time deliveries</label>
+                    <input type="number" name="deliveries_on_time" class="form-control"
+                           value="{{ delivery.deliveries_on_time|default:'0' }}">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <div class="tab-pane fade" id="actuals">
+          <form method="post"
+                action="{% url 'sales_updates:actuals_upsert' group.pk period.pk %}">
+            {% csrf_token %}
+            <div class="card border mb-3">
+              <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Sales order actuals</strong>
+                {% if can_edit %}
+                  <button class="btn btn-primary btn-sm" type="submit">Save actuals</button>
+                {% endif %}
+              </div>
+              <div class="card-body">
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label class="form-label">Revenue actual</label>
+                    <input type="number" name="revenue_actual" step="0.01" class="form-control"
+                           value="{{ actual.revenue_actual|default:'0.00' }}">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Profit actual</label>
+                    <input type="number" name="profit_actual" step="0.01" class="form-control"
+                           value="{{ actual.profit_actual|default:'0.00' }}">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Orders actual</label>
+                    <input type="number" name="orders_actual" class="form-control"
+                           value="{{ actual.orders_actual|default:'0' }}">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <div class="tab-pane fade" id="charts">
+          <h5 class="mb-3">Revenue trend (target vs actual)</h5>
+          <div style="height: 280px;" id="chart-container">
+            <canvas id="revenue-chart"></canvas>
+          </div>
+          <script>
+            (function () {
+              const labels = ["Revenue Target", "Revenue Actual", "Profit Target", "Profit Actual", "Orders Target", "Orders Actual"];
+              const v1 = {{ subtotals.revenue_target|default:0 }};
+              const v2 = {{ subtotals.revenue_actual|default:0 }};
+              const v3 = {{ subtotals.profit_target|default:0 }};
+              const v4 = {{ subtotals.profit_actual|default:0 }};
+              const v5 = {{ subtotals.orders_target|default:0 }};
+              const v6 = {{ subtotals.orders_actual|default:0 }};
+              window.__salesData = {labels, values: [v1, v2, v3, v4, v5, v6]};
+            })();
+          </script>
+          <canvas id="revenue-chart"></canvas>
+          <h5 class="mt-4 mb-3">Margin targets vs actual</h5>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="d-flex justify-content-between mb-1">
+                <span>Target</span><strong>{{ subtotals.margin_pct_target|percentage }}</strong>
+              </div>
+              <div class="progress"><div class="progress-bar" style="width: {{ subtotals.margin_pct_target }}%"></div></div>
+            </div>
+            <div class="col-md-6">
+              <div class="d-flex justify-content-between mb-1">
+                <span>Actual</span>
+                <strong class="{{ subtotals.margin_diff|negative_class }}">{{ subtotals.margin_pct_actual|percentage }}</strong>
+              </div>
+              <div class="progress"><div class="progress-bar bg-success" style="width: {{ subtotals.margin_pct_actual }}%"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="snapshots">
+          <div class="mb-3 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Performance snapshots</h5>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'sales_updates:exports_page' %}">
+              <i class="bi bi-camera me-1"></i> Create snapshot
+            </a>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Created at</th><th>Meeting</th><th>Revenue %</th><th>Profit %</th>
+                  <th>Locked</th><th class="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for snap in snapshots %}
+                  <tr>
+                    <td>{{ snap.created_at|date:"SHORT_DATETIME_FORMAT" }}</td>
+                    <td>{% if snap.meeting %}<a href="{% url 'meetings:meeting_detail' snap.meeting.pk %}">{{ snap.meeting.reference }}</a>{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                    <td>
+                      {% if snap.revenue_pct_achieved >= 100 %}<span class="text-success">{% else %}<span class="{{ snap.revenue_deficit|negative_class }}">{% endif %}
+                      {{ snap.revenue_pct_achieved|percentage }}
+                      </span>
+                    </td>
+                    <td>{{ snap.profit_pct_achieved|percentage }}</td>
+                    <td>
+                      {% if snap.is_locked %}
+                        <span class="badge bg-secondary"><i class="bi bi-lock me-1"></i>Locked</span>
+                      {% else %}
+                        <span class="badge bg-light text-dark"><i class="bi bi-unlock me-1"></i>Editable</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end">
+                      <a class="btn btn-sm btn-outline-secondary"
+                         href="{% url 'sales_updates:snapshot_detail' snap.pk %}">Details</a>
+                      <a class="btn btn-sm btn-outline-secondary"
+                         href="{% url 'sales_updates:snapshot_printable' snap.pk %}" target="_blank">
+                        <i class="bi bi-printer me-1"></i>Print</a>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="6" class="text-center py-4 text-muted">No snapshots yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

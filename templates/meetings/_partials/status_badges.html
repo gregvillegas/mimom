@@ -1,0 +1,24 @@
+{% load permissions %}
+{% if meeting.status == 'DRAFT' %}
+  <span class="badge bg-secondary text-white">Draft</span>
+{% elif meeting.status == 'OPEN_UPDATES' %}
+  <span class="badge bg-info text-white">Open for Department Updates</span>
+{% elif meeting.status == 'AGENDA_FINALIZED' %}
+  <span class="badge bg-primary text-white">Agenda Finalized</span>
+{% elif meeting.status == 'IN_PROGRESS' %}
+  <span class="badge bg-warning text-dark">Meeting In Progress</span>
+{% elif meeting.status == 'FOR_REVIEW' %}
+  <span class="badge bg-secondary bg-opacity-75 text-white">For Review</span>
+{% elif meeting.status == 'RETURNED' %}
+  <span class="badge bg-danger text-white">Returned for Correction</span>
+{% elif meeting.status == 'APPROVED' %}
+  <span class="badge bg-success text-white">Approved</span>
+{% elif meeting.status == 'PUBLISHED' %}
+  <span class="badge bg-success border border-success-subtle text-white">Published</span>
+{% elif meeting.status == 'CLOSED' %}
+  <span class="badge bg-dark text-white">Closed</span>
+{% elif meeting.status == 'ARCHIVED' %}
+  <span class="badge bg-secondary-subtle text-secondary border border-secondary">Archived</span>
+{% else %}
+  <span class="badge bg-light text-dark">{{ meeting.get_status_display }}</span>
+{% endif %}
