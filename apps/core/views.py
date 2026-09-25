@@ -76,4 +76,36 @@ def home(request):
             },
         )
         context.setdefault("sales_groups", [])
+    try:
+        from apps.meetings.services import meetings_prep_dashboard_data
+
+        prep_data = meetings_prep_dashboard_data(request.user)
+        if isinstance(prep_data, tuple) and len(prep_data) >= 2:
+            context["meetings_prep_dashboard_data"] = prep_data[0]
+        elif isinstance(prep_data, dict):
+            context["meetings_prep_dashboard_data"] = prep_data
+        else:
+            context["meetings_prep_dashboard_data"] = {}
+    except Exception:
+        context.setdefault(
+            "meetings_prep_dashboard_data",
+            {
+                "pending_review": 0,
+                "returned": 0,
+                "approved_this_month": 0,
+                "ready_to_publish": 0,
+            },
+        )
+    try:
+        from apps.reports.services import reports_index_data
+
+        rd = reports_index_data(request.user)
+    except Exception:
+        rd = {
+            "generated_today": 0,
+            "exports_week": 0,
+            "snapshots_reports": 0,
+            "open_action_items": 0,
+        }
+    context["reports"] = rd
     return render(request, "dashboard/home.html", context)

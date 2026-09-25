@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+{% block title %}Return for Correction · {{ meeting.reference }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+            <div>
+                <div class="d-flex gap-2 align-items-center mb-1">
+                    <span class="text-muted small font-monospace">{{ meeting.reference }}</span>
+                    {% include 'meetings/_partials/status_badges.html' with meeting=meeting %}
+                </div>
+                <h1 class="h3 fw-bold mb-1">Return for Correction</h1>
+                <p class="text-muted mb-0">{{ meeting.title }}</p>
+            </div>
+            <a href="{% url 'meetings:meeting_detail' meeting.pk %}" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2">
+                <i class="bi bi-arrow-left"></i> Back to Meeting
+            </a>
+        </div>
+
+        <div class="card border-0 shadow-sm border border-warning-subtle mb-4">
+            <div class="card-header bg-warning-subtle border-bottom border-warning-subtle py-3">
+                <h2 class="h6 fw-semibold mb-0 text-warning-emphasis">
+                    <i class="bi bi-arrow-return-left me-1"></i> Return Minutes for Correction
+                </h2>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger small mb-3">
+                        {% for err in form.non_field_errors %}{{ err }}{% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-4">
+                        <label class="form-label small fw-semibold text-danger">
+                            <i class="bi bi-chat-square-text"></i> Reason for Return <span class="text-danger">*</span>
+                        </label>
+                        {% if form.reason %}{{ form.reason }}{% else %}
+                        <textarea name="reason" rows="6" class="form-control" required placeholder="Clearly explain what needs to be corrected, added, or revised..."></textarea>
+                        {% endif %}
+                        <div class="form-text">
+                            Be specific. List each correction needed so the contributor can address them systematically. This reason will be visible in the version history.
+                        </div>
+                        {% if form.reason and form.reason.errors %}<div class="text-danger small mt-1">{{ form.reason.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="card border mb-4">
+                        <div class="card-header bg-light py-2">
+                            <h3 class="h6 fw-semibold mb-0">
+                                <i class="bi bi-list-check me-1"></i> Sections Requiring Correction
+                            </h3>
+                            <div class="form-text">Check all sections that need work. Leave blank if the entire document needs review.</div>
+                        </div>
+                        <div class="card-body">
+                            {% if form.section_types %}
+                            <div class="row g-2">
+                                {% for choice in form.section_types %}
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        {{ choice.tag }}
+                                        <label class="form-check-label small" for="{{ choice.id_for_label }}">
+                                            {{ choice.choice_label }}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="section_types" value="OPENING" id="sec_OPENING">
+                                        <label class="form-check-label small" for="sec_OPENING">Opening Remarks</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="section_types" value="DEPT_UPDATES" id="sec_DEPT_UPDATES">
+                                        <label class="form-check-label small" for="sec_DEPT_UPDATES">Department Updates</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="section_types" value="ACTION_ITEMS" id="sec_ACTION_ITEMS">
+                                        <label class="form-check-label small" for="sec_ACTION_ITEMS">Action Items Review</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="section_types" value="SALES" id="sec_SALES">
+                                        <label class="form-check-label small" for="sec_SALES">Sales Performance</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="section_types" value="OLD_BUSINESS" id="sec_OLD_BUSINESS">
+                                        <label class="form-check-label small" for="sec_OLD_BUSINESS">Old Business</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="section_types" value="NEW_BUSINESS" id="sec_NEW_BUSINESS">
+                                        <label class="form-check-label small" for="sec_NEW_BUSINESS">New Business</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="section_types" value="OTHER" id="sec_OTHER">
+                                        <label class="form-check-label small" for="sec_OTHER">Other Topics</label>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label small fw-semibold text-primary">
+                            <i class="bi bi-journal-text"></i> Management Remarks
+                        </label>
+                        {% if form.management_remarks %}{{ form.management_remarks }}{% else %}
+                        <textarea name="management_remarks" rows="3" class="form-control" placeholder="Additional context, guidance, or notes for the contributor..."></textarea>
+                        {% endif %}
+                        <div class="form-text">Visible to the contributor on the submission dashboard.</div>
+                        {% if form.management_remarks and form.management_remarks.errors %}<div class="text-danger small mt-1">{{ form.management_remarks.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="card border bg-light mb-4">
+                        <div class="card-body small">
+                            <div class="d-flex gap-3 align-items-start">
+                                <i class="bi bi-info-circle text-primary fs-4 flex-shrink-0"></i>
+                                <div>
+                                    <div class="fw-semibold mb-1">What happens next?</div>
+                                    <ul class="mb-0">
+                                        <li>Meeting status will change to <strong>Returned for Correction</strong>.</li>
+                                        <li>The contributor is notified and can edit the minutes.</li>
+                                        <li>Once fixed, the contributor <strong>Resubmits for Review</strong>.</li>
+                                        <li>Full history of this return (reason, who, when) is stored in the version history.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" value="1" id="confirmReturn" required>
+                        <label class="form-check-label small" for="confirmReturn">
+                            I confirm I have clearly documented all corrections needed and that the minutes are not ready for approval in their current state.
+                        </label>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                        <a href="{% url 'meetings:meeting_detail' meeting.pk %}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-warning d-inline-flex align-items-center gap-2">
+                            <i class="bi bi-arrow-return-left"></i> Return for Correction
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -49,6 +49,7 @@ urlpatterns = [
     path("actions/", include("apps.action_items.urls")),
     path("sales/", include("apps.sales_updates.urls")),
     path("notifications/", include("apps.notifications.urls")),
+    path("reports/", include("apps.reports.urls", namespace="reports")),
     path("audit/", include("apps.audit.urls")),
 ]
 

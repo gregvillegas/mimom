@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+{% block title %}Create Action Item · {{ meeting.reference }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+    <div>
+        <div class="d-flex gap-2 align-items-center mb-1">
+            <span class="text-muted small font-monospace">{{ meeting.reference }}</span>
+            {% include 'meetings/_partials/status_badges.html' with meeting=meeting %}
+        </div>
+        <h1 class="h3 fw-bold mb-1">Create Action Item</h1>
+        <p class="text-muted mb-0">Link to: {{ meeting.title }}</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{% url 'meetings:minutes_editor' meeting.pk %}" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2">
+            <i class="bi bi-arrow-left"></i> Back to Minutes Editor
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h2 class="h6 fw-semibold mb-0">
+                    <i class="bi bi-plus-circle text-primary me-1"></i> New Action Item
+                </h2>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger small mb-3">
+                        {% for err in form.non_field_errors %}{{ err }}{% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-8">
+                            <label class="form-label small fw-semibold">Title <span class="text-danger">*</span></label>
+                            {% if form.title %}{{ form.title }}{% else %}
+                            <input type="text" name="title" class="form-control" required placeholder="Describe the action to be taken...">
+                            {% endif %}
+                            {% if form.title and form.title.errors %}<div class="text-danger small mt-1">{{ form.title.errors }}</div>{% endif %}
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small fw-semibold">Priority</label>
+                            {% if form.priority %}{{ form.priority }}{% else %}
+                            <select name="priority" class="form-select">
+                                <option value="LOW">Low</option>
+                                <option value="MEDIUM" selected>Medium</option>
+                                <option value="HIGH">High</option>
+                                <option value="URGENT">Urgent</option>
+                            </select>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Owner</label>
+                            {% if form.owner %}{{ form.owner }}{% else %}
+                            <select name="owner" class="form-select">
+                                <option value="">—— Unassigned ——</option>
+                                {% for u in meeting.attendance.all %}
+                                    {% if u.user %}
+                                    <option value="{{ u.user.pk }}">{{ u.user.get_display_name }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Due Date</label>
+                            {% if form.due_date %}{{ form.due_date }}{% else %}
+                            <input type="date" name="due_date" class="form-control">
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Department</label>
+                            {% if form.department %}{{ form.department }}{% else %}
+                            <select name="department" class="form-select">
+                                <option value="">—— No Department ——</option>
+                                {% if meeting.department %}
+                                    <option value="{{ meeting.department.pk }}" selected>{{ meeting.department.name }}</option>
+                                {% endif %}
+                            </select>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Link to Agenda Item</label>
+                            {% if form.agenda_item %}{{ form.agenda_item }}{% else %}
+                            <select name="agenda_item" class="form-select">
+                                <option value="">—— No specific item ——</option>
+                                {% for item in meeting.agenda_items.all %}
+                                    <option value="{{ item.pk }}">#{{ item.order }} {{ item.title|truncatechars:60 }}</option>
+                                {% endfor %}
+                            </select>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Description / Details</label>
+                        {% if form.description %}{{ form.description }}{% else %}
+                        <textarea name="description" rows="4" class="form-control" placeholder="Background, context, acceptance criteria, notes..."></textarea>
+                        {% endif %}
+                    </div>
+
+                    <div class="card border bg-light mb-4">
+                        <div class="card-body small">
+                            <div class="fw-semibold mb-2"><i class="bi bi-info-circle text-primary"></i> Context</div>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <span class="text-muted">Meeting:</span>
+                                    <strong>{{ meeting.title }}</strong>
+                                    <div class="text-muted small">{{ meeting.reference }} · {{ meeting.start_at|date:"M d, Y" }}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <span class="text-muted">Created by:</span>
+                                    <strong>{{ user.get_display_name }}</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+
+                    <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                        <button type="button" class="btn btn-outline-secondary" onclick="window.parent && window.parent.postMessage({type:'actionitem-cancel'}, '*'); history.back();">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2">
+                            <i class="bi bi-plus-circle"></i> Create &amp; Link Action Item
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="position-sticky" style="top: 1rem;">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h3 class="h6 fw-semibold mb-0">Tips</h3>
+                </div>
+                <ul class="list-group list-group-flush small">
+                    <li class="list-group-item d-flex gap-2 align-items-start">
+                        <i class="bi bi-1-circle-fill text-primary mt-1"></i>
+                        <span>Use a <strong>specific, actionable</strong> title. "Follow up on vendor quote" is better than "Vendor stuff".</span>
+                    </li>
+                    <li class="list-group-item d-flex gap-2 align-items-start">
+                        <i class="bi bi-2-circle-fill text-primary mt-1"></i>
+                        <span>Always set an <strong>Owner</strong> and <strong>Due Date</strong> so accountability is clear.</span>
+                    </li>
+                    <li class="list-group-item d-flex gap-2 align-items-start">
+                        <i class="bi bi-3-circle-fill text-primary mt-1"></i>
+                        <span>Link to the relevant <strong>Agenda Item</strong> so reviewers can trace the decision.</span>
+                    </li>
+                    <li class="list-group-item d-flex gap-2 align-items-start">
+                        <i class="bi bi-4-circle-fill text-primary mt-1"></i>
+                        <span>Add <strong>acceptance criteria</strong> in the description so everyone knows what "done" means.</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

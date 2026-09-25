@@ -4,6 +4,7 @@
 {% load sales_formatting %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
+<div class="px-3 px-lg-5">
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
     <div>
         <h1 class="h3 fw-bold mb-1">Good to see you, {{ user.get_display_name }}.</h1>
@@ -23,8 +24,8 @@
 </div>
 
 <div class="row g-4 mb-4">
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between mb-2">
                     <div class="d-flex align-items-center justify-content-center rounded-3 bg-primary bg-opacity-10 p-2">
@@ -32,14 +33,14 @@
                     </div>
                     <span class="badge rounded-pill bg-primary-subtle text-primary small">Scheduled</span>
                 </div>
-                <div class="h2 fw-bold mb-1">{{ meeting_total|default:0 }}</div>
+                <h3 class="h2 fw-bold mb-1" data-count="{{ meeting_total|default:0 }}">{{ meeting_total|default:0 }}</h3>
                 <div class="small text-muted">Total Meetings</div>
             </div>
         </div>
     </div>
 
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between mb-2">
                     <div class="d-flex align-items-center justify-content-center rounded-3 bg-warning bg-opacity-10 p-2">
@@ -47,14 +48,14 @@
                     </div>
                     <span class="badge rounded-pill bg-warning-subtle text-warning small">Draft</span>
                 </div>
-                <div class="h2 fw-bold mb-1">{{ meeting_counts.DRAFT|default:0 }}</div>
+                <h3 class="h2 fw-bold mb-1" data-count="{{ meeting_counts.DRAFT|default:0 }}">{{ meeting_counts.DRAFT|default:0 }}</h3>
                 <div class="small text-muted">Drafts / Open</div>
             </div>
         </div>
     </div>
 
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between mb-2">
                     <div class="d-flex align-items-center justify-content-center rounded-3 bg-info bg-opacity-10 p-2">
@@ -62,14 +63,14 @@
                     </div>
                     <span class="badge rounded-pill bg-info-subtle text-info small">For Review</span>
                 </div>
-                <div class="h2 fw-bold mb-1">{{ meeting_counts.FOR_REVIEW|default:0 }}</div>
+                <h3 class="h2 fw-bold mb-1" data-count="{{ meeting_counts.FOR_REVIEW|default:0 }}">{{ meeting_counts.FOR_REVIEW|default:0 }}</h3>
                 <div class="small text-muted">Minutes Awaiting Review</div>
             </div>
         </div>
     </div>
 
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between mb-2">
                     <div class="d-flex align-items-center justify-content-center rounded-3 bg-success bg-opacity-10 p-2">
@@ -77,7 +78,7 @@
                     </div>
                     <span class="badge rounded-pill bg-success-subtle text-success small">Published</span>
                 </div>
-                <div class="h2 fw-bold mb-1">{{ meeting_counts.PUBLISHED|default:0|add:meeting_counts.APPROVED|default:0 }}</div>
+                <h3 class="h2 fw-bold mb-1" data-count="{{ meeting_counts.PUBLISHED|default:0|add:meeting_counts.APPROVED|default:0 }}">{{ meeting_counts.PUBLISHED|default:0|add:meeting_counts.APPROVED|default:0 }}</h3>
                 <div class="small text-muted">Approved / Published</div>
             </div>
         </div>
@@ -85,8 +86,8 @@
 </div>
 
 <div class="row g-4 mb-4">
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between mb-2">
                     <div class="d-flex align-items-center justify-content-center rounded-3 bg-primary bg-opacity-10 p-2">
@@ -94,8 +95,14 @@
                     </div>
                     <span class="badge rounded-pill bg-primary-subtle text-primary small">Open</span>
                 </div>
-                <div class="h2 fw-bold mb-1">{{ action_counts.total_open|default:0 }}</div>
+                <h3 class="h2 fw-bold mb-1" data-count="{{ action_counts.total_open|default:0 }}">{{ action_counts.total_open|default:0 }}</h3>
                 <div class="small text-muted">Open Action Items</div>
+                <div class="mt-3" role="progressbar" aria-label="Open action items progress" aria-valuenow="32" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-success" style="width: 32%;"></div>
+                    </div>
+                    <div class="small text-muted mt-1"><span class="visually-hidden">Progress: </span>32% complete</div>
+                </div>
                 <div class="mt-2">
                     <a href="{% url 'action_items:actionitem_list' %}" class="btn btn-sm btn-outline-primary w-100">View all</a>
                 </div>
@@ -103,8 +110,8 @@
         </div>
     </div>
 
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between mb-2">
                     <div class="d-flex align-items-center justify-content-center rounded-3 bg-info bg-opacity-10 p-2">
@@ -112,7 +119,7 @@
                     </div>
                     <span class="badge rounded-pill bg-info-subtle text-info small">Mine</span>
                 </div>
-                <div class="h2 fw-bold mb-1">{{ action_counts.assigned_me|default:0 }}</div>
+                <h3 class="h2 fw-bold mb-1" data-count="{{ action_counts.assigned_me|default:0 }}">{{ action_counts.assigned_me|default:0 }}</h3>
                 <div class="small text-muted">Assigned to me</div>
                 <div class="mt-2">
                     <a href="{% url 'action_items:actionitem_my' %}" class="btn btn-sm btn-outline-primary w-100">My Assignments</a>
@@ -121,8 +128,8 @@
         </div>
     </div>
 
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between mb-2">
                     <div class="d-flex align-items-center justify-content-center rounded-3 bg-danger bg-opacity-10 p-2">
@@ -130,7 +137,7 @@
                     </div>
                     <span class="badge rounded-pill bg-danger-subtle text-danger small">Overdue</span>
                 </div>
-                <div class="h2 fw-bold mb-1">{{ action_counts.overdue|default:0 }}</div>
+                <h3 class="h2 fw-bold mb-1" data-count="{{ action_counts.overdue|default:0 }}">{{ action_counts.overdue|default:0 }}</h3>
                 <div class="small text-muted">Overdue Action Items</div>
                 <div class="mt-2">
                     <a href="{% url 'action_items:actionitem_overdue' %}" class="btn btn-sm btn-outline-danger w-100">Review overdue</a>
@@ -139,8 +146,8 @@
         </div>
     </div>
 
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between mb-2">
                     <div class="d-flex align-items-center justify-content-center rounded-3 bg-success bg-opacity-10 p-2">
@@ -148,7 +155,7 @@
                     </div>
                     <span class="badge rounded-pill bg-success-subtle text-success small">This Week</span>
                 </div>
-                <div class="h2 fw-bold mb-1">{{ action_counts.due_this_week|default:0 }}</div>
+                <h3 class="h2 fw-bold mb-1" data-count="{{ action_counts.due_this_week|default:0 }}">{{ action_counts.due_this_week|default:0 }}</h3>
                 <div class="small text-muted">Due this week · completed: {{ action_counts.completed_this_week|default:0 }}</div>
                 <div class="mt-2">
                     <a href="{% url 'action_items:actionitem_list' %}" class="btn btn-sm btn-outline-primary w-100">Filter list</a>
@@ -159,8 +166,8 @@
 </div>
 
 <div class="row g-4 mb-4">
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between mb-2">
                     <div class="d-flex align-items-center justify-content-center rounded-3 bg-primary bg-opacity-10 p-2">
@@ -170,11 +177,11 @@
                         {% if sales_summary.current_period %}{{ sales_summary.current_period }}{% else %}No period{% endif %}
                     </span>
                 </div>
-                <div class="h2 fw-bold mb-1">
+                <h3 class="h2 fw-bold mb-1">
                     {% if sales_summary.revenue_actual %}
-                        {% currency_cell sales_summary.revenue_actual sales_summary.currency %}
-                    {% else %}0.00{% endif %}
-                </div>
+                        <span data-count="{{ sales_summary.revenue_actual }}">{% currency_cell sales_summary.revenue_actual sales_summary.currency %}</span>
+                    {% else %}<span data-count="0">0.00</span>{% endif %}
+                </h3>
                 <div class="small text-muted">Revenue actual</div>
                 <div class="mt-2 small">
                     {% if sales_summary.revenue_pct %}
@@ -186,8 +193,8 @@
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between mb-2">
                     <div class="d-flex align-items-center justify-content-center rounded-3 bg-info bg-opacity-10 p-2">
@@ -195,15 +202,15 @@
                     </div>
                     <span class="badge rounded-pill bg-info-subtle text-info small">Margin</span>
                 </div>
-                <div class="h2 fw-bold mb-1">
-                    {% if sales_summary.profit_pct_actual %}{{ sales_summary.profit_pct_actual|percentage }}{% else %}0.00%{% endif %}
-                </div>
+                <h3 class="h2 fw-bold mb-1">
+                    {% if sales_summary.profit_pct_actual %}<span data-count="{{ sales_summary.profit_pct_actual }}">{{ sales_summary.profit_pct_actual|percentage }}</span>{% else %}<span data-count="0">0.00%</span>{% endif %}
+                </h3>
                 <div class="small text-muted">Current profit margin</div>
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between mb-2">
                     <div class="d-flex align-items-center justify-content-center rounded-3 bg-danger bg-opacity-10 p-2">
@@ -211,19 +218,19 @@
                     </div>
                     <span class="badge rounded-pill bg-danger-subtle text-danger small">Revenue Gap</span>
                 </div>
-                <div class="h2 fw-bold mb-1 {{ sales_summary.revenue_deficit|negative_class }}">
+                <h3 class="h2 fw-bold mb-1 {{ sales_summary.revenue_deficit|negative_class }}">
                     {% if sales_summary.revenue_deficit is not None and sales_summary.revenue_deficit != 0 %}
-                        {% currency_cell sales_summary.revenue_deficit sales_summary.currency parens=True %}
+                        <span data-count="{{ sales_summary.revenue_deficit }}">{% currency_cell sales_summary.revenue_deficit sales_summary.currency parens=True %}</span>
                     {% else %}
-                        {% currency_cell 0 sales_summary.currency %}
+                        <span data-count="0">{% currency_cell 0 sales_summary.currency %}</span>
                     {% endif %}
-                </div>
+                </h3>
                 <div class="small text-muted">Revenue deficit (target vs actual)</div>
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-3">
-        <div class="card border-0 shadow-sm h-100">
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="d-flex align-items-start justify-content-between mb-2">
                     <div class="d-flex align-items-center justify-content-center rounded-3 bg-warning bg-opacity-10 p-2">
@@ -231,15 +238,246 @@
                     </div>
                     <span class="badge rounded-pill bg-warning-subtle text-warning small">Weeks Left</span>
                 </div>
-                <div class="h2 fw-bold mb-1">
+                <h3 class="h2 fw-bold mb-1" data-count="{% if sales_summary.weeks_count %}{{ sales_summary.weeks_count }}{% else %}0{% endif %}">
                     {% if sales_summary.weeks_count %}{{ sales_summary.weeks_count }}{% else %}—{% endif %}
-                </div>
+                </h3>
                 <div class="small text-muted">
                     Weeks to cut-off
                     {% if sales_summary.days_until_cutoff is not None %}
                         ({{ sales_summary.days_until_cutoff }} days)
                     {% endif %}
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-info bg-opacity-10 p-2">
+                        <i class="bi bi-eye text-info fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-info-subtle text-info small">Review</span>
+                </div>
+                <h3 class="h2 fw-bold mb-1" data-count="{{ meetings_prep_dashboard_data.pending_review|default:0 }}">{{ meetings_prep_dashboard_data.pending_review|default:0 }}</h3>
+                <div class="small text-muted">Pending Review</div>
+                <div class="mt-2">
+                    <a href="{% url 'meetings:prep_dashboard' %}#kpi-row" class="btn btn-sm btn-outline-info w-100">Review queue</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-warning bg-opacity-10 p-2">
+                        <i class="bi bi-arrow-return-left text-warning fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-warning-subtle text-warning small">Returned</span>
+                </div>
+                <h3 class="h2 fw-bold mb-1" data-count="{{ meetings_prep_dashboard_data.returned|default:0 }}">{{ meetings_prep_dashboard_data.returned|default:0 }}</h3>
+                <div class="small text-muted">Returned for Correction</div>
+                <div class="mt-2">
+                    <a href="{% url 'meetings:prep_dashboard' %}#kpi-row" class="btn btn-sm btn-outline-warning w-100">Fix issues</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-success bg-opacity-10 p-2">
+                        <i class="bi bi-patch-check text-success fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-success-subtle text-success small">Approved</span>
+                </div>
+                <h3 class="h2 fw-bold mb-1" data-count="{{ meetings_prep_dashboard_data.approved_this_month|default:0 }}">{{ meetings_prep_dashboard_data.approved_this_month|default:0 }}</h3>
+                <div class="small text-muted">Approved This Month</div>
+                <div class="mt-2">
+                    <a href="{% url 'meetings:meeting_list' %}?status=APPROVED" class="btn btn-sm btn-outline-success w-100">View approved</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-primary bg-opacity-10 p-2">
+                        <i class="bi bi-send text-primary fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-primary-subtle text-primary small">Publish</span>
+                </div>
+                <h3 class="h2 fw-bold mb-1" data-count="{{ meetings_prep_dashboard_data.ready_to_publish|default:0 }}">{{ meetings_prep_dashboard_data.ready_to_publish|default:0 }}</h3>
+                <div class="small text-muted">Ready to Publish</div>
+                <div class="mt-2">
+                    <a href="{% url 'meetings:prep_dashboard' %}#kpi-row" class="btn btn-sm btn-outline-primary w-100">Publish queue</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-primary bg-opacity-10 p-2">
+                        <i class="bi bi-file-earmark-bar-graph text-primary fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-primary-subtle text-primary small">Today</span>
+                </div>
+                <h3 class="h2 fw-bold mb-1" data-count="{{ reports.generated_today|default:0 }}">{{ reports.generated_today|default:0 }}</h3>
+                <div class="small text-muted">Reports Generated Today</div>
+                <div class="mt-2">
+                    <a href="{% url 'reports:index' %}" class="btn btn-sm btn-outline-primary w-100">View reports</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-info bg-opacity-10 p-2">
+                        <i class="bi bi-download text-info fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-info-subtle text-info small">This Week</span>
+                </div>
+                <h3 class="h2 fw-bold mb-1" data-count="{{ reports.exports_week|default:0 }}">{{ reports.exports_week|default:0 }}</h3>
+                <div class="small text-muted">Exports This Week</div>
+                <div class="mt-2">
+                    <a href="{% url 'reports:index' %}" class="btn btn-sm btn-outline-info w-100">Export center</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-success bg-opacity-10 p-2">
+                        <i class="bi bi-camera-reels text-success fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-success-subtle text-success small">Snapshots</span>
+                </div>
+                <h3 class="h2 fw-bold mb-1" data-count="{{ reports.snapshots_reports|default:0 }}">{{ reports.snapshots_reports|default:0 }}</h3>
+                <div class="small text-muted">Snapshot Reports Available</div>
+                <div class="mt-2">
+                    <a href="{% url 'reports:index' %}" class="btn btn-sm btn-outline-success w-100">Browse snapshots</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-12 col-md-6 col-lg-3">
+        <div class="card card-hover card-stats border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-3 bg-warning bg-opacity-10 p-2">
+                        <i class="bi bi-card-checklist text-warning fs-4"></i>
+                    </div>
+                    <span class="badge rounded-pill bg-warning-subtle text-warning small">Open</span>
+                </div>
+                <h3 class="h2 fw-bold mb-1" data-count="{{ reports.open_action_items|default:0 }}">{{ reports.open_action_items|default:0 }}</h3>
+                <div class="small text-muted">Open Action Items</div>
+                <div class="mt-2">
+                    <a href="{% url 'action_items:actionitem_list' %}" class="btn btn-sm btn-outline-warning w-100">Review actions</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-bottom py-3">
+        <h2 class="h6 fw-semibold mb-0">Quick Shortcuts</h2>
+    </div>
+    <div class="card-body py-3">
+        <div class="row g-2">
+            <div class="col-6 col-md-4 col-lg-3">
+                <a href="{% url 'meetings:meeting_list' %}" class="card-link list-group-action-item d-flex align-items-center gap-2 text-decoration-none text-body p-3 rounded-3 border bg-white h-100">
+                    <i class="bi bi-calendar-event text-primary fs-4"></i>
+                    <div>
+                        <div class="fw-medium">Meetings</div>
+                        <div class="small text-muted">View all meetings</div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-lg-3">
+                <a href="{% url 'reports:index' %}" class="card-link list-group-action-item d-flex align-items-center gap-2 text-decoration-none text-body p-3 rounded-3 border bg-white h-100">
+                    <i class="bi bi-file-earmark-bar-graph text-info fs-4"></i>
+                    <div>
+                        <div class="fw-medium">Reports</div>
+                        <div class="small text-muted">Generate reports</div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-lg-3">
+                {% can_create_user_tag as can_create_user %}
+                <a href="{% if can_create_user %}{% url 'accounts:user_create' %}{% else %}#{% endif %}" class="card-link list-group-action-item d-flex align-items-center gap-2 text-decoration-none text-body p-3 rounded-3 border bg-white h-100">
+                    <i class="bi bi-person-plus text-success fs-4"></i>
+                    <div>
+                        <div class="fw-medium">Create User</div>
+                        <div class="small text-muted">Add new user</div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-lg-3">
+                <a href="{% url 'action_items:actionitem_list' %}" class="card-link list-group-action-item d-flex align-items-center gap-2 text-decoration-none text-body p-3 rounded-3 border bg-white h-100">
+                    <i class="bi bi-check2-square text-warning fs-4"></i>
+                    <div>
+                        <div class="fw-medium">Action Items</div>
+                        <div class="small text-muted">Track open items</div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-lg-3">
+                <a href="{% url 'meetings:prep_dashboard' %}" class="card-link list-group-action-item d-flex align-items-center gap-2 text-decoration-none text-body p-3 rounded-3 border bg-white h-100">
+                    <i class="bi bi-clipboard-check text-primary fs-4"></i>
+                    <div>
+                        <div class="fw-medium">Prep Dashboard</div>
+                        <div class="small text-muted">Meeting prep queue</div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-lg-3">
+                <a href="{% url 'sales_updates:group_dashboard' %}" class="card-link list-group-action-item d-flex align-items-center gap-2 text-decoration-none text-body p-3 rounded-3 border bg-white h-100">
+                    <i class="bi bi-graph-up-arrow text-success fs-4"></i>
+                    <div>
+                        <div class="fw-medium">Sales Dashboard</div>
+                        <div class="small text-muted">Performance overview</div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-lg-3">
+                <a href="{% url 'accounts:department_list' %}" class="card-link list-group-action-item d-flex align-items-center gap-2 text-decoration-none text-body p-3 rounded-3 border bg-white h-100">
+                    <i class="bi bi-diagram-3 text-info fs-4"></i>
+                    <div>
+                        <div class="fw-medium">Departments</div>
+                        <div class="small text-muted">Organization structure</div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-6 col-md-4 col-lg-3">
+                <a href="{% url 'accounts:profile_me' %}" class="card-link list-group-action-item d-flex align-items-center gap-2 text-decoration-none text-body p-3 rounded-3 border bg-white h-100">
+                    <i class="bi bi-person-circle text-secondary fs-4"></i>
+                    <div>
+                        <div class="fw-medium">My Profile</div>
+                        <div class="small text-muted">Account settings</div>
+                    </div>
+                </a>
             </div>
         </div>
     </div>
@@ -398,5 +636,6 @@
             </div>
         </div>
     </div>
+</div>
 </div>
 {% endblock %}

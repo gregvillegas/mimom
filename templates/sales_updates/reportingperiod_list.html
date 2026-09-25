@@ -32,32 +32,58 @@
     </div>
   </div>
 
+  <div class="card shadow-sm mb-4 filter-form-card" aria-label="Filter Results">
+    <div class="card-body d-flex flex-wrap gap-2 align-items-end">
+      <form method="get" class="d-flex flex-wrap gap-2 align-items-end w-100" action="">
+        <div class="input-group input-group-lg flex-grow-1" style="min-width: 240px;">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <label class="visually-hidden" for="id_q">Search</label>
+          <input type="search" name="q" value="{{ request.GET.q }}" id="id_q" class="form-control" placeholder="Search period name…">
+        </div>
+        <div>
+          <label class="visually-hidden" for="id_status">Status</label>
+          <select class="form-select form-select-lg" id="id_status" name="status">
+            <option value="">Any status</option>
+            <option value="OPEN" {% if request.GET.status == "OPEN" %}selected{% endif %}>Open</option>
+            <option value="CLOSED" {% if request.GET.status == "CLOSED" %}selected{% endif %}>Closed</option>
+            <option value="DRAFT" {% if request.GET.status == "DRAFT" %}selected{% endif %}>Draft</option>
+          </select>
+        </div>
+        <div class="d-flex gap-2 ms-auto">
+          <button class="btn btn-lg btn-outline-primary"><i class="bi bi-funnel me-1"></i> Filter</button>
+          <a class="btn btn-lg btn-outline-secondary" href="{% url 'sales_updates:period_list' %}"><i class="bi bi-x-lg me-1"></i> Reset</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="card shadow-sm">
-    <div class="table-responsive">
-      <table class="table table-sm align-middle mb-0">
-        <thead class="table-light">
+    <div class="scrollable-table-wrap" tabindex="0">
+      <table class="table table-sm align-middle mb-0 table-hover" data-table-hover>
+        <caption class="visually-hidden">Table: {{ page_title|default:"Reporting Periods" }}</caption>
+        <thead class="sticky-thead table-light">
           <tr>
-            <th>Name</th>
-            <th>Start</th>
-            <th>End</th>
-            <th>Cut-off</th>
-            <th>Weeks</th>
-            <th>Status</th>
-            <th>Currency</th>
-            <th class="text-end">Actions</th>
+            <th scope="col">Name</th>
+            <th scope="col">Start</th>
+            <th scope="col">End</th>
+            <th scope="col">Cut-off</th>
+            <th scope="col">Weeks</th>
+            <th scope="col">Status</th>
+            <th scope="col">Currency</th>
+            <th scope="col" class="text-end">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for period in periods %}
             <tr>
-              <td>
+              <td data-label="Name">
                 <a href="{% url 'sales_updates:group_dashboard_period' period.pk %}">
                   <strong>{{ period.name }}</strong>
                 </a>
               </td>
-              <td>{{ period.start_date|date:"SHORT_DATE_FORMAT" }}</td>
-              <td>{{ period.end_date|date:"SHORT_DATE_FORMAT" }}</td>
-              <td>
+              <td data-label="Start">{{ period.start_date|date:"SHORT_DATE_FORMAT" }}</td>
+              <td data-label="End">{{ period.end_date|date:"SHORT_DATE_FORMAT" }}</td>
+              <td data-label="Cut-off">
                 <span class="{% if period.days_until_cutoff < 0 %}text-danger{% elif period.days_until_cutoff <= 3 %}text-warning{% else %}text-muted{% endif %}">
                   {{ period.cut_off_date|date:"SHORT_DATE_FORMAT" }}
                   <small class="d-block">
@@ -68,8 +94,8 @@
                     {% endif %}
                 </small>
               </td>
-              <td>{{ period.weeks_count }}</td>
-              <td>
+              <td data-label="Weeks">{{ period.weeks_count }}</td>
+              <td data-label="Status">
                 {% if period.status == "OPEN" %}
                   <span class="badge bg-success">Open</span>
                 {% elif period.status == "CLOSED" %}
@@ -78,14 +104,18 @@
                   <span class="badge bg-light text-dark">Draft</span>
                 {% endif %}
               </td>
-              <td>{{ period.get_currency_display }}</td>
-              <td class="text-end">
+              <td data-label="Currency">{{ period.get_currency_display }}</td>
+              <td data-label="Actions" class="text-end">
                 <a class="btn btn-sm btn-outline-secondary"
                    href="{% url 'sales_updates:period_update' period.pk %}">Edit</a>
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="8" class="text-center py-5 text-muted">No reporting periods yet.</td></tr>
+            <tr>
+                <td colspan="8">
+                    {% include 'components/empty_state.html' with icon='calendar-range' title='No reporting periods yet' message='Create a new reporting period to begin tracking sales performance targets.' %}
+                </td>
+            </tr>
           {% endfor %}
         </tbody>
       </table>

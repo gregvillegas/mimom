@@ -474,3 +474,181 @@ class SalesEditRequiredMixin(UserPassesTestMixin):
         if getattr(user, "is_superuser", False):
             return True
         return user.has_role(*SALES_AUTHOR_ROLES)
+
+
+MINUTES_AUTHOR_ROLES = (
+    ROLE_SYSTEM_ADMIN,
+    ROLE_MANAGEMENT_ADMIN,
+    ROLE_MEETING_CHAIR,
+    ROLE_MINUTES_SECRETARY,
+    ROLE_DEPT_CONTRIBUTOR,
+)
+MINUTES_VIEWER_ROLES = (
+    *MINUTES_AUTHOR_ROLES,
+    ROLE_VIEWER,
+)
+MINUTES_REVIEW_ROLES = (
+    ROLE_SYSTEM_ADMIN,
+    ROLE_MANAGEMENT_ADMIN,
+    ROLE_MEETING_CHAIR,
+)
+MINUTES_APPROVER_ROLES = (
+    ROLE_SYSTEM_ADMIN,
+    ROLE_MANAGEMENT_ADMIN,
+    ROLE_MEETING_CHAIR,
+)
+MINUTES_PUBLISHER_ROLES = (
+    ROLE_SYSTEM_ADMIN,
+    ROLE_MANAGEMENT_ADMIN,
+    ROLE_MEETING_CHAIR,
+)
+MINUTES_SNAPSHOT_ROLES = (
+    ROLE_SYSTEM_ADMIN,
+    ROLE_MANAGEMENT_ADMIN,
+    ROLE_MEETING_CHAIR,
+    ROLE_MINUTES_SECRETARY,
+)
+
+
+def can_submit_minutes(user, meeting=None):
+    if not _active_authenticated(user):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    if meeting is not None and not getattr(meeting, "is_editable", True):
+        return False
+    return user.has_role(*MINUTES_AUTHOR_ROLES)
+
+
+def can_return_minutes(user, meeting=None):
+    if not _active_authenticated(user):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return user.has_role(*MINUTES_REVIEW_ROLES)
+
+
+def can_resubmit_minutes(user, meeting=None):
+    if not _active_authenticated(user):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    if meeting is not None and not getattr(meeting, "is_editable", True):
+        return False
+    return user.has_role(*MINUTES_AUTHOR_ROLES)
+
+
+def can_approve_meeting(user, meeting=None):
+    if not _active_authenticated(user):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return user.has_role(*MINUTES_APPROVER_ROLES)
+
+
+def can_publish_meeting(user, meeting=None):
+    if not _active_authenticated(user):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return user.has_role(*MINUTES_PUBLISHER_ROLES)
+
+
+def can_close_meeting(user, meeting=None):
+    if not _active_authenticated(user):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return user.has_role(*MINUTES_PUBLISHER_ROLES)
+
+
+def can_reopen_meeting(user, meeting=None):
+    if not _active_authenticated(user):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return user.has_role(*REOPEN_AUTHORIZED_ROLES)
+
+
+def can_create_snapshot(user, meeting=None):
+    if not _active_authenticated(user):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return user.has_role(*MINUTES_SNAPSHOT_ROLES)
+
+
+class MinutesEditRequiredMixin(UserPassesTestMixin):
+    def get_meeting(self):
+        return getattr(self, "object", None) or self.get_object()
+
+    def test_func(self):
+        meeting = self.get_meeting()
+        return can_submit_minutes(self.request.user, meeting)
+
+
+class MinutesReviewRequiredMixin(UserPassesTestMixin):
+    def get_meeting(self):
+        return getattr(self, "object", None) or self.get_object()
+
+    def test_func(self):
+        meeting = self.get_meeting()
+        return can_return_minutes(self.request.user, meeting)
+
+
+class MinutesApproverRequiredMixin(UserPassesTestMixin):
+    def get_meeting(self):
+        return getattr(self, "object", None) or self.get_object()
+
+    def test_func(self):
+        meeting = self.get_meeting()
+        return can_approve_meeting(self.request.user, meeting)
+
+
+REPORT_EXPORT_ROLES = (
+    ROLE_SYSTEM_ADMIN,
+    ROLE_MANAGEMENT_ADMIN,
+    ROLE_MEETING_CHAIR,
+    ROLE_MINUTES_SECRETARY,
+)
+
+
+def can_export_reports(user):
+    if not _active_authenticated(user):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return user.has_role(*REPORT_EXPORT_ROLES)
+
+
+class ReportExportRequiredMixin(UserPassesTestMixin):
+    def test_func(self):
+        return can_export_reports(self.request.user)
+
+
+ORG_MANAGEMENT_ROLES = (
+    ROLE_SYSTEM_ADMIN,
+    ROLE_MANAGEMENT_ADMIN,
+    ROLE_MEETING_CHAIR,
+    ROLE_MINUTES_SECRETARY,
+)
+
+
+def can_manage_departments(user) -> bool:
+    return _active_authenticated(user) and (
+        getattr(user, "is_superuser", False) or user.has_role(*ORG_MANAGEMENT_ROLES)
+    )
+
+
+def can_manage_positions(user) -> bool:
+    return _active_authenticated(user) and (
+        getattr(user, "is_superuser", False) or user.has_role(*ORG_MANAGEMENT_ROLES)
+    )
+
+
+def can_view_org(user) -> bool:
+    return _active_authenticated(user)
+
+
+class OrgManagementRequiredMixin(RoleRequiredMixin):
+    required_roles = ORG_MANAGEMENT_ROLES

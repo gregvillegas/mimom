@@ -11,26 +11,27 @@
     </a>
 </div>
 
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-body py-3">
-        <form method="get" class="row g-2 align-items-end">
-            <div class="col-12 col-md-6">
-                <label class="form-label small fw-medium text-body-secondary">Search</label>
-                <input type="text" name="q" class="form-control" placeholder="Search by username, email, or name…" value="{{ query }}">
+<div class="card border-0 shadow-sm mb-4 filter-form-card" aria-label="Filter Results">
+    <div class="card-body d-flex flex-wrap gap-2 align-items-end">
+        <form method="get" class="d-flex flex-wrap gap-2 align-items-end w-100">
+            <div class="input-group input-group-lg flex-grow-1" style="min-width: 240px;">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <label class="visually-hidden" for="id_q">Search</label>
+                <input type="text" name="q" id="id_q" class="form-control" placeholder="Search by username, email, or name…" value="{{ query }}">
             </div>
-            <div class="col-6 col-md-3">
-                <label class="form-label small fw-medium text-body-secondary">Status</label>
-                <select name="status" class="form-select">
+            <div>
+                <label class="visually-hidden" for="id_status">Status</label>
+                <select name="status" id="id_status" class="form-select form-select-lg">
                     <option value="">All</option>
                     <option value="active" {% if status == "active" %}selected{% endif %}>Active</option>
                     <option value="inactive" {% if status == "inactive" %}selected{% endif %}>Inactive</option>
                 </select>
             </div>
-            <div class="col-6 col-md-3 d-flex gap-2">
-                <button type="submit" class="btn btn-outline-primary btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-2">
-                    <i class="bi bi-search"></i> Filter
+            <div class="d-flex gap-2 ms-auto">
+                <button type="submit" class="btn btn-lg btn-outline-primary d-inline-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-funnel"></i> Filter
                 </button>
-                <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-2">
+                <a href="{% url 'accounts:user_list' %}" class="btn btn-lg btn-outline-secondary d-inline-flex align-items-center justify-content-center gap-2">
                     <i class="bi bi-x-lg"></i> Reset
                 </a>
             </div>
@@ -39,21 +40,22 @@
 </div>
 
 <div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-        <table class="table align-middle mb-0">
-            <thead class="bg-white border-bottom">
+    <div class="scrollable-table-wrap" tabindex="0">
+        <table class="table align-middle mb-0 table-hover" data-table-hover>
+            <caption class="visually-hidden">Table: {{ page_title|default:"Users" }}</caption>
+            <thead class="sticky-thead bg-white border-bottom">
                 <tr>
-                    <th class="small text-uppercase fw-semibold text-body-secondary ps-3">User</th>
-                    <th class="small text-uppercase fw-semibold text-body-secondary">Primary Department</th>
-                    <th class="small text-uppercase fw-semibold text-body-secondary">Roles</th>
-                    <th class="small text-uppercase fw-semibold text-body-secondary">Status</th>
-                    <th class="small text-uppercase fw-semibold text-body-secondary pe-3 text-end">Actions</th>
+                    <th scope="col" class="small text-uppercase fw-semibold text-body-secondary ps-3">User</th>
+                    <th scope="col" class="small text-uppercase fw-semibold text-body-secondary">Primary Department</th>
+                    <th scope="col" class="small text-uppercase fw-semibold text-body-secondary">Roles</th>
+                    <th scope="col" class="small text-uppercase fw-semibold text-body-secondary">Status</th>
+                    <th scope="col" class="small text-uppercase fw-semibold text-body-secondary pe-3 text-end">Actions</th>
                 </tr>
             </thead>
             <tbody class="bg-white">
                 {% for u in users %}
                 <tr class="border-bottom">
-                    <td class="ps-3 py-3">
+                    <td data-label="User" class="ps-3 py-3">
                         <div class="d-flex align-items-center gap-2">
                             <span class="d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 text-primary fw-semibold" style="width: 34px; height: 34px; font-size: 0.8rem;">
                                 {{ u.get_initials }}
@@ -64,7 +66,7 @@
                             </div>
                         </div>
                     </td>
-                    <td class="py-3">
+                    <td data-label="Primary Department" class="py-3">
                         {% with u.get_primary_department as dept %}
                             {% if dept %}
                                 <span class="text-body">{{ dept.name }}</span>
@@ -73,7 +75,7 @@
                             {% endif %}
                         {% endwith %}
                     </td>
-                    <td class="py-3">
+                    <td data-label="Roles" class="py-3">
                         <div class="d-flex flex-wrap gap-1">
                         {% for grp in u.groups.all %}
                             <span class="badge rounded-pill bg-secondary-subtle text-body-secondary small">{{ grp.name }}</span>
@@ -82,7 +84,7 @@
                         {% endfor %}
                         </div>
                     </td>
-                    <td class="py-3">
+                    <td data-label="Status" class="py-3">
                         {% if u.is_active %}
                             <span class="badge rounded-pill bg-success-subtle text-success small">Active</span>
                         {% else %}
@@ -92,7 +94,7 @@
                             <span class="badge rounded-pill bg-primary-subtle text-primary small ms-1">Staff</span>
                         {% endif %}
                     </td>
-                    <td class="py-3 pe-3 text-end">
+                    <td data-label="Actions" class="py-3 pe-3 text-end">
                         <div class="d-inline-flex gap-1 justify-content-end">
                             <a href="{% url 'accounts:profile_detail' u.pk %}" class="btn btn-sm btn-outline-secondary" title="View profile">
                                 <i class="bi bi-person"></i>
@@ -119,8 +121,8 @@
 
     {% if is_paginated %}
     <div class="card-body border-top py-3">
-        <nav aria-label="Users pagination">
-            <ul class="pagination pagination-sm mb-0 justify-content-center">
+        <nav aria-label="Users pagination" class="d-flex justify-content-center mt-4 mb-4 pagination-lg">
+            <ul class="pagination pagination-lg mb-0 justify-content-center">
                 {% if page_obj.has_previous %}
                 <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if query %}&amp;q={{ query }}{% endif %}{% if status %}&amp;status={{ status }}{% endif %}">Previous</a></li>
                 {% endif %}

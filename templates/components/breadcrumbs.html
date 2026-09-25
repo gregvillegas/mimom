@@ -1,17 +1,19 @@
 {% if breadcrumbs %}
 <nav aria-label="breadcrumb" class="mb-4">
+    <span class="visually-hidden">Breadcrumb</span>
     <ol class="breadcrumb mb-0 small">
-        {% for label, url in breadcrumbs %}
-            {% if url and not forloop.last %}
-                <li class="breadcrumb-item"><a href="{{ url }}" class="text-decoration-none">{{ label }}</a></li>
+        {% for item in breadcrumbs %}
+            {% if item.url and not forloop.last %}
+                <li class="breadcrumb-item"><a href="{{ item.url }}" class="text-decoration-none">{{ item.name }}</a></li>
             {% else %}
-                <li class="breadcrumb-item active" aria-current="page">{{ label }}</li>
+                <li class="breadcrumb-item active" aria-current="page">{{ item.name }}</li>
             {% endif %}
         {% endfor %}
     </ol>
 </nav>
 {% elif page_title %}
 <nav aria-label="breadcrumb" class="mb-4">
+    <span class="visually-hidden">Breadcrumb</span>
     <ol class="breadcrumb mb-0 small">
         <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-decoration-none">Home</a></li>
         <li class="breadcrumb-item active" aria-current="page">{{ page_title }}</li>

@@ -14,136 +14,134 @@
       <h1 class="h4 mb-0">{% if object and object.pk %}Edit agenda item{% else %}Add agenda item{% endif %}</h1>
       <div class="small text-muted mt-1">{{ meeting.reference }} — {{ meeting.title }}</div>
     </div>
-    <form method="post" class="card-body" novalidate>
+    <form method="post" class="card-body" novalidate id="agendaItemForm" aria-describedby="{% if form.non_field_errors %}validation-summary{% endif %}">
       {% csrf_token %}
-      {% if form.errors %}
-        <div class="alert alert-danger mb-3">
-          <ul class="mb-0">
-            {% for field, errors in form.errors.items %}
-              {% for err in errors %}
-                <li><strong>{{ field|capfirst }}:</strong> {{ err }}</li>
-              {% endfor %}
-            {% endfor %}
-          </ul>
-        </div>
-      {% endif %}
-      <fieldset class="mb-4">
-        <legend class="small text-uppercase fw-semibold text-muted mb-2">Structure</legend>
-        <div class="row g-3">
-          <div class="col-12 col-md-3">
-            <label class="form-label">Order</label>
-            {{ form.order }}
+      <div class="scrollable-form-wrapper">
+        <div class="row g-3 form-grid">
+          <div class="col-12">
+            {% include 'includes/alerts_container.html' with errors=form.non_field_errors %}
           </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">Category</label>
-            {{ form.category }}
-          </div>
-          <div class="col-12 col-md-5">
-            <label class="form-label">Parent item (optional)</label>
-            {{ form.parent_item }}
-          </div>
-        </div>
-      </fieldset>
-      <fieldset class="mb-4">
-        <legend class="small text-uppercase fw-semibold text-muted mb-2">Content</legend>
-        <div class="mb-3">
-          <label class="form-label">Title</label>
-          {{ form.title }}
-        </div>
-        <div class="row g-3">
-          <div class="col-12 col-md-4">
-            <label class="form-label">Owner</label>
-            {{ form.owner }}
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">Department</label>
-            {{ form.department }}
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">Status</label>
-            {{ form.item_status }}
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label">Time allocated (minutes)</label>
-            {{ form.time_allocated_minutes }}
-          </div>
-          <div class="col-12 col-md-8 d-flex align-items-end">
-            <label class="form-check form-switch mt-4">
-              {{ form.is_confidential }}
-              <span class="form-check-label">Confidential — visible only to meeting chair, minutes secretary, owner and department head</span>
-            </label>
-          </div>
-        </div>
-        <div class="mt-3">
-          <label class="form-label">Discussion / Background</label>
-          {{ form.discussion }}
-        </div>
-        <div class="mt-3">
-          <label class="form-label">Decision (after meeting)</label>
-          {{ form.decision }}
-        </div>
-        <div class="mt-3">
-          <label class="form-label">Notes</label>
-          {{ form.notes }}
-        </div>
-      </fieldset>
-      {% if object and object.pk %}
-        <fieldset class="mb-4">
-          <legend class="small text-uppercase fw-semibold text-muted mb-2">Item attachments</legend>
-          <form method="post" action="{% url 'meetings:agenda_item_attachment_upload' object.pk %}" enctype="multipart/form-data" class="card card-body bg-light border mb-3">
-            {% csrf_token %}
-            <div class="row g-2 align-items-end">
-              <div class="col-12 col-md-6">
-                <label class="form-label small">Upload file</label>
-                <input type="file" class="form-control form-control-sm" name="file" required>
+
+          <fieldset class="col-12 mb-4">
+            <legend class="small text-uppercase fw-semibold text-muted mb-2">Structure</legend>
+            <div class="row g-3">
+              <div class="col-12 col-md-3">
+                <label for="{{ form.order.id_for_label }}" class="form-label">Order</label>
+                {{ form.order }}{% if form.order.errors %}<div class="invalid-feedback">{% for err in form.order.errors %}{{ err }}{% endfor %}</div>{% endif %}
               </div>
               <div class="col-12 col-md-4">
-                <label class="form-label small">Display name</label>
-                <input type="text" class="form-control form-control-sm" name="display_name">
+                <label for="{{ form.category.id_for_label }}" class="form-label">Category</label>
+                {{ form.category }}{% if form.category.errors %}<div class="invalid-feedback">{% for err in form.category.errors %}{{ err }}{% endfor %}</div>{% endif %}
               </div>
-              <div class="col-12 col-md-2">
-                <label class="form-check form-switch mt-4">
-                  <input type="checkbox" class="form-check-input" name="is_confidential">
-                  <span class="form-check-label small">Confidential</span>
-                </label>
-              </div>
-              <div class="col-12 text-end mt-2">
-                <button class="btn btn-sm btn-primary">Attach</button>
+              <div class="col-12 col-md-5">
+                <label for="{{ form.parent_item.id_for_label }}" class="form-label">Parent item (optional)</label>
+                {{ form.parent_item }}{% if form.parent_item.errors %}<div class="invalid-feedback">{% for err in form.parent_item.errors %}{{ err }}{% endfor %}</div>{% endif %}
               </div>
             </div>
-          </form>
-          <ul class="list-group">
-            {% for att in object.attachments.all %}
-              <li class="list-group-item d-flex gap-3 align-items-center">
-                <i class="bi bi-paperclip text-secondary"></i>
-                <div class="flex-grow-1">
-                  <a class="fw-medium text-decoration-none" href="{{ att.file.url }}">{{ att.display_name|default:att.file.name }}</a>
-                  <div class="small text-muted">
-                    Uploaded {% if att.uploaded_by %}by {{ att.uploaded_by.get_display_name }} {% endif %}on {{ att.created_at|date:"M d, Y" }}
-                    {% if att.is_confidential %} · <span class="badge bg-danger-subtle text-danger">Confidential</span>{% endif %}
+          </fieldset>
+
+          <fieldset class="col-12 mb-4">
+            <legend class="small text-uppercase fw-semibold text-muted mb-2">Content</legend>
+            <div class="mb-3">
+              <label for="{{ form.title.id_for_label }}" class="form-label">Title</label>
+              {{ form.title }}{% if form.title.errors %}<div class="invalid-feedback">{% for err in form.title.errors %}{{ err }}{% endfor %}</div>{% endif %}
+            </div>
+            <div class="row g-3">
+              <div class="col-12 col-md-4">
+                <label for="{{ form.owner.id_for_label }}" class="form-label">Owner</label>
+                {{ form.owner }}{% if form.owner.errors %}<div class="invalid-feedback">{% for err in form.owner.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="{{ form.department.id_for_label }}" class="form-label">Department</label>
+                {{ form.department }}{% if form.department.errors %}<div class="invalid-feedback">{% for err in form.department.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="{{ form.item_status.id_for_label }}" class="form-label">Status</label>
+                {{ form.item_status }}{% if form.item_status.errors %}<div class="invalid-feedback">{% for err in form.item_status.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="{{ form.time_allocated_minutes.id_for_label }}" class="form-label">Time allocated (minutes)</label>
+                {{ form.time_allocated_minutes }}{% if form.time_allocated_minutes.errors %}<div class="invalid-feedback">{% for err in form.time_allocated_minutes.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-12 col-md-8 d-flex align-items-end">
+                <label class="form-check form-switch mt-4">
+                  <input type="checkbox" name="{{ form.is_confidential.html_name }}" id="{{ form.is_confidential.id_for_label }}" class="form-check-input" {% if form.is_confidential.value %}checked{% endif %}>
+                  <span class="form-check-label">Confidential — visible only to meeting chair, minutes secretary, owner and department head</span>
+                </label>
+              </div>
+            </div>
+            <div class="mt-3">
+              <label for="{{ form.discussion.id_for_label }}" class="form-label">Discussion / Background</label>
+              {{ form.discussion }}{% if form.discussion.errors %}<div class="invalid-feedback">{% for err in form.discussion.errors %}{{ err }}{% endfor %}</div>{% endif %}
+            </div>
+            <div class="mt-3">
+              <label for="{{ form.decision.id_for_label }}" class="form-label">Decision (after meeting)</label>
+              {{ form.decision }}{% if form.decision.errors %}<div class="invalid-feedback">{% for err in form.decision.errors %}{{ err }}{% endfor %}</div>{% endif %}
+            </div>
+            <div class="mt-3">
+              <label for="{{ form.notes.id_for_label }}" class="form-label">Notes</label>
+              {{ form.notes }}{% if form.notes.errors %}<div class="invalid-feedback">{% for err in form.notes.errors %}{{ err }}{% endfor %}</div>{% endif %}
+            </div>
+          </fieldset>
+
+          {% if object and object.pk %}
+            <fieldset class="col-12 mb-4">
+              <legend class="small text-uppercase fw-semibold text-muted mb-2">Item attachments</legend>
+              <form method="post" action="{% url 'meetings:agenda_item_attachment_upload' object.pk %}" enctype="multipart/form-data" class="card card-body bg-light border mb-3">
+                {% csrf_token %}
+                <div class="row g-2 align-items-end">
+                  <div class="col-12 col-md-6">
+                    <label class="form-label small" for="id_upload_file">Upload file</label>
+                    <input type="file" class="form-control form-control-sm" name="file" id="id_upload_file" required>
+                  </div>
+                  <div class="col-12 col-md-4">
+                    <label class="form-label small" for="id_display_name">Display name</label>
+                    <input type="text" class="form-control form-control-sm" name="display_name" id="id_display_name">
+                  </div>
+                  <div class="col-12 col-md-2">
+                    <label class="form-check form-switch mt-4">
+                      <input type="checkbox" class="form-check-input" name="is_confidential" id="id_is_confidential">
+                      <span class="form-check-label small">Confidential</span>
+                    </label>
+                  </div>
+                  <div class="col-12 text-end mt-2">
+                    <button class="btn btn-sm btn-primary">Attach</button>
                   </div>
                 </div>
-                <form method="post" action="{% url 'meetings:agenda_item_attachment_delete' att.pk %}" onsubmit="return confirm('Delete this attachment?');">
-                  {% csrf_token %}
-                  <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                </form>
-              </li>
-            {% empty %}
-              <li class="list-group-item text-muted text-center py-2">No attachments yet.</li>
-            {% endfor %}
-          </ul>
-        </fieldset>
-      {% endif %}
-      <div class="d-flex justify-content-between flex-wrap gap-2">
-        <div class="small text-muted">
+              </form>
+              <ul class="list-group">
+                {% for att in object.attachments.all %}
+                  <li class="list-group-item d-flex gap-3 align-items-center">
+                    <i class="bi bi-paperclip text-secondary"></i>
+                    <div class="flex-grow-1">
+                      <a class="fw-medium text-decoration-none" href="{{ att.file.url }}">{{ att.display_name|default:att.file.name }}</a>
+                      <div class="small text-muted">
+                        Uploaded {% if att.uploaded_by %}by {{ att.uploaded_by.get_display_name }} {% endif %}on {{ att.created_at|date:"M d, Y" }}
+                        {% if att.is_confidential %} · <span class="badge bg-danger-subtle text-danger">Confidential</span>{% endif %}
+                      </div>
+                    </div>
+                    <form method="post" action="{% url 'meetings:agenda_item_attachment_delete' att.pk %}" onsubmit="return confirm('Delete this attachment?');">
+                      {% csrf_token %}
+                      <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                    </form>
+                  </li>
+                {% empty %}
+                  <li class="list-group-item text-muted text-center py-2">No attachments yet.</li>
+                {% endfor %}
+              </ul>
+            </fieldset>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="sticky-submit-bar btn-primary-submit mt-3">
+        <div class="me-auto small text-muted d-none d-md-block">
           {% if object and object.carried_forward_from %}
             Carried forward from agenda item <span class="font-monospace">{{ object.carried_forward_from.pk }}</span>.
           {% endif %}
         </div>
-        <div class="d-flex gap-2">
-          <a class="btn btn-outline-secondary" href="{% url 'meetings:meeting_detail' meeting.pk %}">Cancel</a>
-          <button type="submit" class="btn btn-primary">{% if object and object.pk %}Save changes{% else %}Add item{% endif %}</button>
-        </div>
+        <a class="btn btn-outline-secondary" href="{% url 'meetings:meeting_detail' meeting.pk %}">Cancel</a>
+        <button type="submit" class="btn btn-primary">{% if object and object.pk %}Save changes{% else %}Add item{% endif %}</button>
       </div>
     </form>
   </div>

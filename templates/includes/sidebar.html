@@ -1,115 +1,167 @@
-<aside class="sidebar d-none d-md-flex flex-column bg-white border-end py-4 px-3 shadow-sm" style="width: 260px;">
-    <div class="px-2 mb-4">
-        <div class="fw-bold text-primary mb-1">Management Meetings</div>
-        <div class="small text-muted">Minutes &amp; Action Tracking</div>
+<aside id="sidebarNav" class="sidebar sidebar-nav d-none d-lg-flex flex-column bg-white border-end py-4 px-3 shadow-sm" style="width: 280px;">
+    <div class="d-flex align-items-center justify-content-between px-2 mb-4">
+        <div class="sidebar-header-text">
+            <div class="fw-bold text-primary mb-1">Management Meetings</div>
+            <div class="small text-muted">Minutes &amp; Action Tracking</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary sidebar-collapse-btn" data-intranet-sidebar-collapse aria-label="Toggle sidebar" aria-expanded="true">
+            <i class="bi bi-chevron-left sidebar-collapse-icon"></i>
+        </button>
     </div>
 
     <nav class="nav flex-column gap-1 flex-grow-1">
         <a href="{% url 'home' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
             <i class="bi bi-grid-1x2-fill"></i>
-            <span>Dashboard</span>
+            <span class="sidebar-label">Dashboard</span>
         </a>
 
-        <div class="px-2 mt-4 mb-1 small text-uppercase fw-semibold text-muted">Meetings</div>
         {% load permissions %}
         {% can_create_meeting_tag as can_create_meeting %}
-        <a href="{% url 'meetings:meeting_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
-            <i class="bi bi-calendar-event"></i>
-            <span>Meetings</span>
-        </a>
-        <a href="{% url 'meetings:meeting_list' %}?view=calendar" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
-            <i class="bi bi-calendar3"></i>
-            <span>Calendar</span>
-        </a>
-        <a href="{% url 'meetings:agenda_category_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
-            <i class="bi bi-list-check"></i>
-            <span>Agenda Categories</span>
-        </a>
-        {% if can_create_meeting %}
-        <a href="{% url 'meetings:meeting_create' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
-            <i class="bi bi-plus-circle"></i>
-            <span>New Meeting</span>
-        </a>
-        {% endif %}
 
-        <div class="px-2 mt-4 mb-1 small text-uppercase fw-semibold text-muted">Actions</div>
+        <div class="sidebar-section mt-4">
+            <button class="btn sidebar-section-header w-100 d-flex align-items-center justify-content-between px-2 py-1" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-collapse-meetings" aria-expanded="true" aria-controls="sidebar-collapse-meetings">
+                <span class="small text-uppercase fw-semibold text-muted sidebar-section-title">Meetings</span>
+                <i class="bi bi-chevron-down sidebar-section-chevron small"></i>
+            </button>
+            <div class="collapse show" id="sidebar-collapse-meetings">
+                <a href="{% url 'meetings:prep_dashboard' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary {% if request.resolver_match.url_name == 'prep_dashboard' %}active{% endif %}">
+                    <i class="bi bi-table"></i>
+                    <span class="sidebar-label">Minutes Prep Dashboard</span>
+                </a>
+                <a class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary {% if request.resolver_match.view_name == 'reports:index' %}active{% endif %}" href="{% url 'reports:index' %}">
+                    <i class="bi bi-file-earmark-bar-graph"></i>
+                    <span class="sidebar-label">Reports &amp; Exports</span>
+                </a>
+                <a href="{% url 'meetings:meeting_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary {% if request.resolver_match.url_name and request.resolver_match.url_name|startswith:'meeting_' %}active{% endif %}">
+                    <i class="bi bi-calendar-event"></i>
+                    <span class="sidebar-label">Meetings</span>
+                </a>
+                <a href="{% url 'meetings:meeting_list' %}#version-history" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
+                    <i class="bi bi-clock-history"></i>
+                    <span class="sidebar-label">Version History Index</span>
+                </a>
+                <a href="{% url 'meetings:meeting_list' %}?view=calendar" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
+                    <i class="bi bi-calendar3"></i>
+                    <span class="sidebar-label">Calendar</span>
+                </a>
+                <a href="{% url 'meetings:agenda_category_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary {% if request.resolver_match.url_name and request.resolver_match.url_name|startswith:'agenda_' %}active{% endif %}">
+                    <i class="bi bi-list-check"></i>
+                    <span class="sidebar-label">Agenda Categories</span>
+                </a>
+                {% if can_create_meeting %}
+                <a href="{% url 'meetings:meeting_create' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
+                    <i class="bi bi-plus-circle"></i>
+                    <span class="sidebar-label">New Meeting</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
 
-        <a href="{% url 'action_items:actionitem_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
-            <i class="bi bi-check2-square"></i>
-            <span>All Action Items</span>
-        </a>
-        <a href="{% url 'action_items:actionitem_overdue' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
-            <i class="bi bi-exclamation-circle"></i>
-            <span>Overdue Items</span>
-        </a>
-        <a href="{% url 'action_items:actionitem_my' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
-            <i class="bi bi-person-check"></i>
-            <span>My Assignments</span>
-        </a>
+        <div class="sidebar-section mt-4">
+            <button class="btn sidebar-section-header w-100 d-flex align-items-center justify-content-between px-2 py-1" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-collapse-actions" aria-expanded="true" aria-controls="sidebar-collapse-actions">
+                <span class="small text-uppercase fw-semibold text-muted sidebar-section-title">Actions</span>
+                <i class="bi bi-chevron-down sidebar-section-chevron small"></i>
+            </button>
+            <div class="collapse show" id="sidebar-collapse-actions">
+                <a href="{% url 'action_items:actionitem_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary {% if request.resolver_match.url_name and request.resolver_match.url_name|startswith:'actionitem_' %}active{% endif %}">
+                    <i class="bi bi-check2-square"></i>
+                    <span class="sidebar-label">All Action Items</span>
+                </a>
+                <a href="{% url 'action_items:actionitem_overdue' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary {% if request.resolver_match.url_name and request.resolver_match.url_name|startswith:'actionitem_' %}active{% endif %}">
+                    <i class="bi bi-exclamation-circle"></i>
+                    <span class="sidebar-label">Overdue Items</span>
+                </a>
+                <a href="{% url 'action_items:actionitem_my' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary {% if request.resolver_match.url_name and request.resolver_match.url_name|startswith:'actionitem_' %}active{% endif %}">
+                    <i class="bi bi-person-check"></i>
+                    <span class="sidebar-label">My Assignments</span>
+                </a>
+            </div>
+        </div>
 
-        <div class="px-2 mt-4 mb-1 small text-uppercase fw-semibold text-muted">Reports</div>
-
-        <a href="{% url 'sales_updates:group_dashboard' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
-            <i class="bi bi-graph-up-arrow"></i>
-            <span>Sales Performance</span>
-        </a>
-        <a href="{% url 'sales_updates:period_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
-            <i class="bi bi-calendar-week"></i>
-            <span>Reporting Periods</span>
-        </a>
-        <a href="{% url 'sales_updates:exports_page' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
-            <i class="bi bi-file-earmark-arrow-down"></i>
-            <span>Reports & Exports</span>
-        </a>
+        <div class="sidebar-section mt-4">
+            <button class="btn sidebar-section-header w-100 d-flex align-items-center justify-content-between px-2 py-1" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-collapse-reports" aria-expanded="true" aria-controls="sidebar-collapse-reports">
+                <span class="small text-uppercase fw-semibold text-muted sidebar-section-title">Reports</span>
+                <i class="bi bi-chevron-down sidebar-section-chevron small"></i>
+            </button>
+            <div class="collapse show" id="sidebar-collapse-reports">
+                <a href="{% url 'sales_updates:group_dashboard' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary {% if request.resolver_match.url_name and request.resolver_match.url_name|startswith:'group_' or request.resolver_match.url_name and request.resolver_match.url_name|startswith:'dashboard' %}active{% endif %}">
+                    <i class="bi bi-graph-up-arrow"></i>
+                    <span class="sidebar-label">Sales Performance</span>
+                </a>
+                <a href="{% url 'sales_updates:period_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary {% if request.resolver_match.url_name and request.resolver_match.url_name|startswith:'period_' %}active{% endif %}">
+                    <i class="bi bi-calendar-week"></i>
+                    <span class="sidebar-label">Reporting Periods</span>
+                </a>
+                <a href="{% url 'sales_updates:exports_page' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary {% if request.resolver_match.url_name and request.resolver_match.url_name|startswith:'export_' or request.resolver_match.url_name == 'exports_page' or request.resolver_match.url_name and request.resolver_match.url_name|startswith:'snapshot_' or request.resolver_match.url_name and request.resolver_match.url_name|startswith:'team_' or request.resolver_match.url_name and request.resolver_match.url_name|startswith:'target_' or request.resolver_match.url_name and request.resolver_match.url_name|startswith:'delivery_' or request.resolver_match.url_name and request.resolver_match.url_name|startswith:'actuals_' %}active{% endif %}">
+                    <i class="bi bi-file-earmark-arrow-down"></i>
+                    <span class="sidebar-label">Reports &amp; Exports</span>
+                </a>
+            </div>
+        </div>
 
         {% load permissions %}
         {% can_manage_users_tag as can_manage_users %}
         {% can_manage_department_assignments_tag as can_assign_depts %}
-        {% if can_manage_users or can_assign_depts or user.is_staff %}
-        <div class="px-2 mt-4 mb-1 small text-uppercase fw-semibold text-muted">Organization</div>
-
-        {% if can_manage_users %}
-        <a href="{% url 'accounts:user_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
-            <i class="bi bi-people"></i>
-            <span>Users</span>
-        </a>
-        {% endif %}
-        {% if can_assign_depts or can_manage_users %}
-        <a href="#" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
-            <i class="bi bi-diagram-3"></i>
-            <span>Departments</span>
-        </a>
-        <a href="#" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
-            <i class="bi bi-briefcase"></i>
-            <span>Positions</span>
-        </a>
-        <a href="#" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
-            <i class="bi bi-person-badge"></i>
-            <span>Teams</span>
-        </a>
-        {% endif %}
+        {% can_manage_departments_tag as can_manage_depts %}
+        {% can_manage_positions_tag as can_manage_positions %}
+        {% can_view_org_tag as can_view_org %}
+        {% if can_manage_users or can_assign_depts or user.is_staff or can_manage_depts or can_manage_positions %}
+        <div class="sidebar-section mt-4">
+            <button class="btn sidebar-section-header w-100 d-flex align-items-center justify-content-between px-2 py-1" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-collapse-org" aria-expanded="true" aria-controls="sidebar-collapse-org">
+                <span class="small text-uppercase fw-semibold text-muted sidebar-section-title">Organization</span>
+                <i class="bi bi-chevron-down sidebar-section-chevron small"></i>
+            </button>
+            <div class="collapse show" id="sidebar-collapse-org">
+                {% if can_manage_users %}
+                <a href="{% url 'accounts:user_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary {% if request.resolver_match.url_name and request.resolver_match.url_name|startswith:'user_' %}active{% endif %}">
+                    <i class="bi bi-people"></i>
+                    <span class="sidebar-label">Users</span>
+                </a>
+                {% endif %}
+                {% if can_manage_depts or can_manage_users or can_assign_depts or can_view_org %}
+                <a href="{% url 'accounts:department_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary {% if request.resolver_match.url_name and request.resolver_match.url_name|startswith:'department_' %}active{% endif %}">
+                    <i class="bi bi-diagram-3"></i>
+                    <span class="sidebar-label">Departments</span>
+                </a>
+                <a href="{% url 'accounts:position_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary {% if request.resolver_match.url_name and request.resolver_match.url_name|startswith:'position_' %}active{% endif %}">
+                    <i class="bi bi-briefcase"></i>
+                    <span class="sidebar-label">Positions</span>
+                </a>
+                <a href="{% url 'accounts:team_list' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary {% if request.resolver_match.url_name and request.resolver_match.url_name|startswith:'team_' %}active{% endif %}">
+                    <i class="bi bi-person-badge"></i>
+                    <span class="sidebar-label">Teams</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
         {% endif %}
 
         {% if user.is_staff or can_manage_users %}
-        <div class="px-2 mt-4 mb-1 small text-uppercase fw-semibold text-muted">Admin</div>
-
-        {% if can_manage_users %}
-        <a href="{% url 'accounts:user_create' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
-            <i class="bi bi-person-plus"></i>
-            <span>New User</span>
-        </a>
-        {% endif %}
-        {% if user.is_staff %}
-        <a href="{% url 'admin:index' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary">
-            <i class="bi bi-tools"></i>
-            <span>System Admin</span>
-        </a>
-        {% endif %}
+        <div class="sidebar-section mt-4">
+            <button class="btn sidebar-section-header w-100 d-flex align-items-center justify-content-between px-2 py-1" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-collapse-admin" aria-expanded="true" aria-controls="sidebar-collapse-admin">
+                <span class="small text-uppercase fw-semibold text-muted sidebar-section-title">Admin</span>
+                <i class="bi bi-chevron-down sidebar-section-chevron small"></i>
+            </button>
+            <div class="collapse show" id="sidebar-collapse-admin">
+                {% if can_manage_users %}
+                <a href="{% url 'accounts:user_create' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary {% if request.resolver_match.url_name and request.resolver_match.url_name == 'user_create' %}active{% endif %}">
+                    <i class="bi bi-person-plus"></i>
+                    <span class="sidebar-label">New User</span>
+                </a>
+                {% endif %}
+                {% if user.is_staff %}
+                <a href="{% url 'admin:index' %}" class="nav-link d-flex align-items-center gap-2 rounded-2 px-3 py-2 text-secondary {% if request.resolver_match.app_name == 'admin' %}active{% endif %}">
+                    <i class="bi bi-tools"></i>
+                    <span class="sidebar-label">System Admin</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
         {% endif %}
     </nav>
 
-    <div class="mt-4 pt-3 border-top">
-        <div class="small text-muted">
+    <div class="mt-4 pt-3 border-top sidebar-footer">
+        <div class="small text-muted sidebar-footer-text">
             <div class="d-flex justify-content-between mb-1">
                 <span>Today</span>
                 <span class="fw-medium text-body">{% now 'M d, Y' %}</span>

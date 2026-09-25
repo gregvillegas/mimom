@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+{% load permissions %}
+{% can_manage_departments_tag as can_manage_depts %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+    <div>
+        <h1 class="h3 fw-bold mb-1">{{ department.name }}</h1>
+        <p class="text-muted small mb-0">
+            {% if department.code %}<span class="font-monospace">{{ department.code }}</span> &middot; {% endif %}
+            {% if department.head %}Head: <a href="{% url 'accounts:profile_detail' department.head.pk %}" class="text-muted text-decoration-underline">{{ department.head.get_display_name }}</a>{% endif %}
+        </p>
+    </div>
+    <div class="d-inline-flex gap-2">
+        <a href="{% url 'accounts:department_list' %}" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-2">
+            <i class="bi bi-arrow-left"></i> All Departments
+        </a>
+        {% if can_manage_depts %}
+        <a href="{% url 'accounts:department_edit' department.pk %}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-2">
+            <i class="bi bi-pencil"></i> Edit
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom py-3">
+                <h2 class="h6 fw-semibold mb-0">Details</h2>
+            </div>
+            <div class="card-body py-3">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 small fw-medium text-body-secondary">Status</dt>
+                    <dd class="col-sm-8">
+                        {% if department.is_active %}
+                            <span class="badge rounded-pill bg-success-subtle text-success small">Active</span>
+                        {% else %}
+                            <span class="badge rounded-pill bg-secondary-subtle text-secondary small">Inactive</span>
+                        {% endif %}
+                    </dd>
+                    <dt class="col-sm-4 small fw-medium text-body-secondary pt-2">Head</dt>
+                    <dd class="col-sm-8 pt-2">
+                        {% if department.head %}
+                            <a href="{% url 'accounts:profile_detail' department.head.pk %}">{{ department.head.get_display_name }}</a>
+                        {% else %}<span class="text-muted small">—</span>{% endif %}
+                    </dd>
+                    <dt class="col-sm-4 small fw-medium text-body-secondary pt-2">Parent Dept</dt>
+                    <dd class="col-sm-8 pt-2">
+                        {% if department.parent %}
+                            <a href="{% url 'accounts:department_detail' department.parent.pk %}">{{ department.parent.name }}</a>
+                        {% else %}<span class="text-muted small">Top-level</span>{% endif %}
+                    </dd>
+                    <dt class="col-sm-4 small fw-medium text-body-secondary pt-2">Code</dt>
+                    <dd class="col-sm-8 pt-2">
+                        {% if department.code %}<span class="font-monospace">{{ department.code }}</span>{% else %}<span class="text-muted small">—</span>{% endif %}
+                    </dd>
+                    {% if department.description %}
+                    <dt class="col-sm-4 small fw-medium text-body-secondary pt-2">Description</dt>
+                    <dd class="col-sm-8 pt-2">{{ department.description }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-bottom py-3">
+                <h2 class="h6 fw-semibold mb-0">Stats</h2>
+            </div>
+            <div class="card-body py-3">
+                <div class="row g-3 text-center">
+                    <div class="col-6">
+                        <div class="py-3 rounded-3 bg-primary-subtle">
+                            <div class="h4 fw-bold text-primary mb-0">{{ memberships.count }}</div>
+                            <div class="small text-body-secondary mt-1">Total Members</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="py-3 rounded-3 bg-success-subtle">
+                            <div class="h4 fw-bold text-success mb-0">{{ memberships|dictsortreversed:"is_primary"|length }}</div>
+                            <div class="small text-body-secondary mt-1">Active</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <h2 class="h6 fw-semibold mb-0">Members ({{ memberships.count }})</h2>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead class="bg-white border-bottom">
+                <tr>
+                    <th class="small text-uppercase fw-semibold text-body-secondary ps-3">User</th>
+                    <th class="small text-uppercase fw-semibold text-body-secondary">Position</th>
+                    <th class="small text-uppercase fw-semibold text-body-secondary">Primary</th>
+                    <th class="small text-uppercase fw-semibold text-body-secondary">Contributor</th>
+                    <th class="small text-uppercase fw-semibold text-body-secondary">Status</th>
+                    <th class="small text-uppercase fw-semibold text-body-secondary pe-3 text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white">
+                {% for m in memberships %}
+                <tr class="border-bottom">
+                    <td class="ps-3 py-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="d-flex align-items-center justify-content-center rounded-circle bg-primary bg-opacity-10 text-primary fw-semibold" style="width: 34px; height: 34px; font-size: 0.8rem;">
+                                {{ m.user.get_initials }}
+                            </span>
+                            <div class="d-flex flex-column">
+                                <a href="{% url 'accounts:profile_detail' m.user.pk %}" class="fw-semibold text-decoration-none">{{ m.user.get_display_name }}</a>
+                                <span class="small text-muted">{{ m.user.email }}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="py-3">
+                        {% if m.position %}
+                            <a href="{% url 'accounts:position_detail' m.position.pk %}" class="text-body text-decoration-none">{{ m.position.name }}</a>
+                            <span class="small text-muted ms-1">L{{ m.position.level }}</span>
+                        {% else %}
+                            <span class="text-muted small">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="py-3">
+                        {% if m.is_primary %}
+                            <span class="badge rounded-pill bg-primary-subtle text-primary small">Primary</span>
+                        {% else %}
+                            <span class="text-muted small">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="py-3">
+                        {% if m.is_contributor %}
+                            <span class="badge rounded-pill bg-info-subtle text-info small">Contributor</span>
+                        {% else %}
+                            <span class="text-muted small">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="py-3">
+                        {% if m.is_active %}
+                            <span class="badge rounded-pill bg-success-subtle text-success small">Active</span>
+                        {% else %}
+                            <span class="badge rounded-pill bg-secondary-subtle text-secondary small">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td class="py-3 pe-3 text-end">
+                        <a href="{% url 'accounts:profile_detail' m.user.pk %}" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-person"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6">
+                        {% include 'components/empty_state.html' with icon='people' title='No members in this department' message='Assign users via department memberships from the user page.' %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

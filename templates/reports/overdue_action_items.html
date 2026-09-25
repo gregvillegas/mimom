@@ -1,0 +1,124 @@
+{% extends 'reports/base_printable.html' %}
+
+{% block page_title %}Overdue Action Items | {{ company|default:"MIMOM" }}{% endblock %}
+
+{% block report_header %}
+<div class="doc-header">
+    <div class="company">{{ company|default:"MIMOM" }}</div>
+    <div class="title">{{ view_title|default:"Overdue Action Items" }}</div>
+    <div class="meta">
+        <span><strong>Document:</strong> AI-OVERDUE-ALERT</span>
+        {% if reporting_cutoff %}<span><strong>Cut-off:</strong> {{ reporting_cutoff }}</span>{% endif %}
+        <span><strong>As-of:</strong> {% now "Y-m-d" %}</span>
+        <span><strong>Version:</strong> 1.0</span>
+    </div>
+    <div class="meta">
+        {% if generated_at %}<span><strong>Generated:</strong> {{ generated_at|date:"Y-m-d H:i:s" }}</span>
+        {% else %}<span><strong>Generated:</strong> {% now "Y-m-d H:i:s" %}</span>{% endif %}
+        <span><strong>Overdue Records:</strong> {{ action_items|length|default:0 }}</span>
+    </div>
+</div>
+{% endblock report_header %}
+
+{% block report_content %}
+
+<h2>Summary</h2>
+<table>
+    <tbody>
+        <tr>
+            <th style="width: 25%;">Company</th>
+            <td style="width: 25%;">{{ company|default:"MIMOM" }}</td>
+            <th style="width: 25%;">Report Type</th>
+            <td style="width: 25%;">{{ view_title|default:"Overdue Action Items" }}</td>
+        </tr>
+        <tr>
+            <th>Overdue Items Count</th>
+            <td><strong style="color: #9b2c2c;">{{ action_items|length|default:0 }}</strong></td>
+            <th>Report Date</th>
+            <td>{% now "Y-m-d" %}</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Overdue Action Items</h2>
+<table>
+    <thead>
+        <tr>
+            <th style="width: 4%;">#</th>
+            <th style="width: 10%;">Overdue</th>
+            <th style="width: 11%;">Reference</th>
+            <th style="width: 20%;">Title</th>
+            <th style="width: 11%;">Owner</th>
+            <th style="width: 10%;">Department</th>
+            <th style="width: 9%;">Due Date</th>
+            <th style="width: 5%;">Days</th>
+            <th style="width: 9%;">Status</th>
+            <th style="width: 6%;">Priority</th>
+            <th style="width: 5%;">Source</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in action_items %}
+        <tr class="action-row danger">
+            <td>{{ forloop.counter }}</td>
+            <td>
+                <span class="badge badge-danger">OVERDUE</span>
+            </td>
+            <td style="font-family: monospace; font-size: 9pt;">{{ item.reference|default:"—" }}</td>
+            <td>
+                <strong>{{ item.title|default:"—" }}</strong>
+                {% if item.description %}
+                <div style="font-size: 8.5pt; color: #555; margin-top: 2pt;">
+                    {{ item.description|truncatewords:20|default:"" }}
+                </div>
+                {% endif %}
+            </td>
+            <td>
+                {% if item.owner %}{{ item.owner.get_display_name|default:item.owner }}{% else %}<em>Unassigned</em>{% endif %}
+            </td>
+            <td>{{ item.department.name|default:item.department|default:"—" }}</td>
+            <td>
+                <strong style="color: #9b2c2c;">
+                    {% if item.due_date %}{{ item.due_date|date:"Y-m-d" }}{% else %}<em>—</em>{% endif %}
+                </strong>
+            </td>
+            <td class="num">
+                {% if item.overdue_age_days is not None %}
+                <strong style="color: #9b2c2c;">{{ item.overdue_age_days }}</strong>
+                {% elif item.is_overdue %}
+                <em style="color: #9b2c2c;">Yes</em>
+                {% else %}
+                —
+                {% endif %}
+            </td>
+            <td>
+                {% with status=item.get_status_display|default:item.status %}
+                <span class="badge
+                    {% if status == 'OPEN' %}badge-info
+                    {% elif status == 'IN_PROGRESS' %}badge-warning
+                    {% elif status == 'BLOCKED' %}badge-danger
+                    {% elif status == 'UNDER_REVIEW' %}badge-secondary
+                    {% elif status == 'REOPENED' %}badge-warning
+                    {% else %}badge-secondary{% endif %}">
+                    {{ status|default:"—" }}
+                </span>
+                {% endwith %}
+            </td>
+            <td>
+                {% if item.get_priority_display %}{{ item.get_priority_display }}{% else %}{{ item.priority|default:"—" }}{% endif %}
+            </td>
+            <td style="font-size: 8.5pt;">
+                {% if item.source_meeting %}{{ item.source_meeting.reference|default:item.source_meeting|truncatechars:10 }}{% else %}—{% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="11" style="text-align: center; padding: 20pt;">
+                <em style="color: #198754;">No overdue action items. All items are current or in terminal state.</em>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock report_content %}

@@ -1,0 +1,614 @@
+{% extends 'reports/base_printable.html' %}
+{% load sales_formatting %}
+
+{% block page_title %}
+{% if snapshot %}{{ snapshot.meeting.reference|default:"Minutes" }} · v{{ snapshot.version }} · Meeting Minutes{% else %}Management Meeting Minutes{% endif %}
+{% endblock %}
+
+{% block report_header %}
+<div class="doc-header">
+    <div class="company">{{ company|default:"MIMOM" }}</div>
+    <div class="title">
+        {% if minutes and minutes.meeting_meta %}{{ minutes.meeting_meta.title|default:"Management Meeting Minutes" }}
+        {% elif snapshot and snapshot.meeting %}{{ snapshot.meeting.title|default:"Management Meeting Minutes" }}
+        {% else %}Management Meeting Minutes{% endif %}
+    </div>
+    <div class="meta">
+        {% with meta=minutes.meeting_meta|default:minutes.metadata|default:None %}
+        {% if meta and meta.reference %}<span><strong>Ref:</strong> {{ meta.reference }}</span>
+        {% elif snapshot and snapshot.meeting and snapshot.meeting.reference %}<span><strong>Ref:</strong> {{ snapshot.meeting.reference }}</span>{% endif %}
+        {% if meta and meta.start_at %}<span><strong>Meeting Date:</strong> {{ meta.start_at }}</span>
+        {% elif snapshot and snapshot.meeting and snapshot.meeting.start_at %}<span><strong>Meeting Date:</strong> {{ snapshot.meeting.start_at|date:"Y-m-d H:i" }}</span>{% endif %}
+        {% if reporting_cutoff or meta and meta.reporting_cutoff %}<span><strong>Reporting Cut-off:</strong> {{ reporting_cutoff|default:meta.reporting_cutoff }}</span>{% endif %}
+        {% if meta and meta.status %}<span><strong>Status:</strong> {{ meta.status }}</span>
+        {% elif snapshot %}<span><strong>Status:</strong> Approved</span>{% endif %}
+        {% if version or snapshot %}<span><strong>Version:</strong> {{ version|default:"v"|add:snapshot.version }}</span>{% endif %}
+        {% endwith %}
+    </div>
+
+    {% with attendance=minutes.attendance|default:snapshot.payload.attendance|default:None %}
+    {% if attendance %}
+    <div class="section-attendance">
+        <h4>Attendance Summary</h4>
+        <table style="width: 100%; margin: 4pt 0 6pt 0;">
+            <thead>
+                <tr>
+                    <th style="width: 35%;">Person</th>
+                    <th style="width: 25%;">Role</th>
+                    <th style="width: 12%; text-align: center;">Invited</th>
+                    <th style="width: 13%; text-align: center;">Attended</th>
+                    <th style="width: 15%;">RSVP</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in attendance %}
+                <tr>
+                    <td><strong>{{ a.user_name|default:a.name|default:"—" }}</strong></td>
+                    <td>{{ a.role_at_meeting|default:a.role|default:"—" }}</td>
+                    <td style="text-align: center;">{% if a.is_invited %}✓{% else %}—{% endif %}</td>
+                    <td style="text-align: center;">{% if a.is_attended %}✓{% else %}—{% endif %}</td>
+                    <td>{{ a.rsvp_status_label|default:a.rsvp_status|default:"—" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" style="text-align: center;">No attendance records.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <div class="meta">
+        {% if generated_at %}<span><strong>Generated:</strong> {{ generated_at|date:"Y-m-d H:i:s" }}{% else %}<span><strong>Generated:</strong> {% now "Y-m-d H:i:s" %}{% endif %}</span>
+        <span><strong>Document:</strong> Management Meeting Minutes</span>
+    </div>
+</div>
+{% endblock report_header %}
+
+{% block report_content %}
+
+<h2>1. Meeting Metadata</h2>
+<table>
+    <tbody>
+        {% with meta=minutes.meeting_meta|default:minutes.metadata|default:None %}
+        <tr>
+            <th style="width: 20%;">Company</th>
+            <td style="width: 30%;">{{ company|default:"MIMOM" }}</td>
+            <th style="width: 20%;">Document Title</th>
+            <td style="width: 30%;">Management Meeting Minutes</td>
+        </tr>
+        <tr>
+            <th>Reference</th>
+            <td>{{ meta.reference|default:snapshot.meeting.reference|default:"—" }}</td>
+            <th>Meeting Type</th>
+            <td>{{ meta.type_name|default:meta.meeting_type_name|default:snapshot.meeting.type|default:"—" }}</td>
+        </tr>
+        <tr>
+            <th>Meeting Date</th>
+            <td>{{ meta.start_at|default:snapshot.meeting.start_at|date:"Y-m-d H:i"|default:"—" }}</td>
+            <th>End Time</th>
+            <td>{{ meta.end_at|default:snapshot.meeting.end_at|date:"Y-m-d H:i"|default:"—" }}</td>
+        </tr>
+        <tr>
+            <th>Location</th>
+            <td>{{ meta.location|default:snapshot.meeting.location|default:"—" }}</td>
+            <th>Chairperson</th>
+            <td>{{ meta.chair_name|default:"—" }}</td>
+        </tr>
+        <tr>
+            <th>Status at Snapshot</th>
+            <td>{{ meta.status|default:"Approved" }}</td>
+            <th>Version</th>
+            <td>{{ minutes.version|default:snapshot.payload.version|default:"v"|add:snapshot.version|default:"—" }}</td>
+        </tr>
+        {% if meta.department_name %}
+        <tr>
+            <th>Department</th>
+            <td>{{ meta.department_name }}</td>
+            <th>Trigger</th>
+            <td>{{ snapshot.get_trigger_display|default:snapshot.trigger|default:"—" }}</td>
+        </tr>
+        {% endif %}
+        {% if meta.description %}
+        <tr>
+            <th>Description</th>
+            <td colspan="3">{{ meta.description }}</td>
+        </tr>
+        {% endif %}
+        {% if meta.notes %}
+        <tr>
+            <th>Meeting Notes</th>
+            <td colspan="3">{{ meta.notes }}</td>
+        </tr>
+        {% endif %}
+        {% endwith %}
+    </tbody>
+</table>
+
+<h2>2. Attendance</h2>
+{% with attendance=minutes.attendance|default:snapshot.payload.attendance|default:None %}
+{% if attendance %}
+<table>
+    <thead>
+        <tr>
+            <th style="width: 8%;">#</th>
+            <th style="width: 28%;">Name</th>
+            <th style="width: 20%;">Role at Meeting</th>
+            <th style="width: 12%; text-align: center;">Invited</th>
+            <th style="width: 12%; text-align: center;">Attended</th>
+            <th style="width: 20%;">RSVP Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for a in attendance %}
+        <tr>
+            <td>{{ forloop.counter }}</td>
+            <td><strong>{{ a.user_name|default:a.name|default:"—" }}</strong></td>
+            <td>{{ a.role_at_meeting|default:a.role|default:"—" }}</td>
+            <td style="text-align: center;">{% if a.is_invited %}✓{% else %}—{% endif %}</td>
+            <td style="text-align: center;">{% if a.is_attended %}✓{% else %}—{% endif %}</td>
+            <td>{{ a.rsvp_status_label|default:a.rsvp_status|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p><em>No attendance records on file.</em></p>
+{% endif %}
+{% endwith %}
+
+<h2>3. Agenda Items</h2>
+{% with agenda=minutes.agenda_items|default:None %}
+{% if agenda %}
+<table>
+    <thead>
+        <tr>
+            <th style="width: 8%;">#</th>
+            <th style="width: 40%;">Agenda Item</th>
+            <th style="width: 18%;">Category</th>
+            <th style="width: 18%;">Department</th>
+            <th style="width: 16%;">Owner</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in agenda %}
+        <tr class="action-row">
+            <td>{{ item.order|default:forloop.counter }}</td>
+            <td><strong>{{ item.title|default:"Untitled" }}</strong>{% if item.is_confidential %} <span class="badge badge-warning">Confidential</span>{% endif %}</td>
+            <td>{% if item.category_name %}{{ item.category_name }}{% else %}—{% endif %}</td>
+            <td>{% if item.department_name %}{{ item.department_name }}{% else %}—{% endif %}</td>
+            <td>{% if item.owner_name %}{{ item.owner_name }}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p><em>No agenda items on file.</em></p>
+{% endif %}
+{% endwith %}
+
+<h2>4. Discussion Summaries</h2>
+{% with discussions=minutes.discussions|default:minutes.agenda_items|default:None %}
+{% if discussions %}
+    {% for item in discussions %}
+    {% if item.discussion or item.discussion_summary or item.summary %}
+    <div style="border: 1px solid #b8c4d8; border-radius: 4pt; padding: 8pt 10pt; margin: 6pt 0;">
+        <h3 style="margin-top: 0;">
+            #{{ item.order|default:forloop.counter }} &middot; {{ item.title|default:"Untitled" }}
+            {% if item.category_name %} <span class="badge badge-secondary">{{ item.category_name }}</span>{% endif %}
+        </h3>
+        <div style="background: #eef4fb; padding: 6pt 8pt; border-radius: 3pt;">
+            <h4 style="margin: 0 0 4pt 0; font-size: 10pt; color: #1f3a68;">Discussion</h4>
+            <div>{{ item.discussion|default:item.discussion_summary|default:item.summary|default:"" }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% empty %}
+    <p><em>No discussion summaries recorded.</em></p>
+    {% endfor %}
+{% else %}
+<p><em>No discussion summaries recorded.</em></p>
+{% endif %}
+{% endwith %}
+
+<h2>5. Decisions</h2>
+{% with decisions=minutes.decisions|default:minutes.agenda_items|default:None %}
+{% if decisions %}
+    {% for item in decisions %}
+    {% if item.decision %}
+    <div style="border: 1px solid #b8c4d8; border-radius: 4pt; padding: 8pt 10pt; margin: 6pt 0;">
+        <h3 style="margin-top: 0;">
+            #{{ item.order|default:forloop.counter }} &middot; {{ item.title|default:"Untitled" }}
+        </h3>
+        <div style="background: #e8f5e9; padding: 6pt 8pt; border-radius: 3pt;">
+            <h4 style="margin: 0 0 4pt 0; font-size: 10pt; color: #1b5e20;">Decision</h4>
+            <div>{{ item.decision }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% empty %}
+    <p><em>No decisions recorded.</em></p>
+    {% endfor %}
+{% else %}
+<p><em>No decisions recorded.</em></p>
+{% endif %}
+{% endwith %}
+
+<h2>6. Action Items</h2>
+{% with actions=minutes.action_items|default:snapshot.payload.action_items|default:None %}
+{% if actions %}
+<table>
+    <thead>
+        <tr>
+            <th style="width: 6%;">#</th>
+            <th style="width: 14%;">Reference</th>
+            <th style="width: 28%;">Title / Description</th>
+            <th style="width: 14%;">Owner</th>
+            <th style="width: 10%;">Priority</th>
+            <th style="width: 12%;">Due Date</th>
+            <th style="width: 16%;">Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ai in actions %}
+        <tr class="action-row">
+            <td>{{ forloop.counter }}</td>
+            <td style="font-family: monospace; font-size: 9pt;">{{ ai.reference|default:"—" }}</td>
+            <td>{{ ai.title|default:ai.description|default:"—" }}</td>
+            <td>{{ ai.owner_name|default:ai.owner|default:"—" }}</td>
+            <td>{{ ai.priority_label|default:ai.priority|default:"—" }}</td>
+            <td>{{ ai.due_date|default:"—" }}</td>
+            <td>{{ ai.status_label|default:ai.status|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p><em>No action items linked.</em></p>
+{% endif %}
+{% endwith %}
+
+<h2>7. Owners &amp; Responsibilities</h2>
+{% with actions=minutes.action_items|default:snapshot.payload.action_items|default:None %}
+{% if actions %}
+<table>
+    <thead>
+        <tr>
+            <th style="width: 30%;">Owner</th>
+            <th style="width: 40%;">Action Item</th>
+            <th style="width: 15%;">Due Date</th>
+            <th style="width: 15%;">Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ai in actions %}
+        <tr class="action-row">
+            <td><strong>{{ ai.owner_name|default:ai.owner|default:"Unassigned" }}</strong></td>
+            <td>{{ ai.reference|default:"" }} &middot; {{ ai.title|default:"—" }}</td>
+            <td>{{ ai.due_date|default:"—" }}</td>
+            <td>{{ ai.status_label|default:ai.status|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p><em>No ownership assignments on file.</em></p>
+{% endif %}
+{% endwith %}
+
+<h2>8. Due Dates &amp; Milestones</h2>
+{% with actions=minutes.action_items|default:snapshot.payload.action_items|default:None %}
+{% if actions %}
+<table>
+    <thead>
+        <tr>
+            <th style="width: 10%;">Ref</th>
+            <th style="width: 35%;">Action Item</th>
+            <th style="width: 20%;">Owner</th>
+            <th style="width: 20%;">Due Date</th>
+            <th style="width: 15%;">Priority</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ai in actions %}
+        <tr class="action-row">
+            <td style="font-family: monospace; font-size: 9pt;">{{ ai.reference|default:"—" }}</td>
+            <td>{{ ai.title|default:"—" }}</td>
+            <td>{{ ai.owner_name|default:ai.owner|default:"—" }}</td>
+            <td>{{ ai.due_date|default:"<em>No due date</em>" }}</td>
+            <td>{{ ai.priority_label|default:ai.priority|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p><em>No milestones tracked.</em></p>
+{% endif %}
+{% endwith %}
+
+<h2>9. Statuses</h2>
+{% with actions=minutes.action_items|default:snapshot.payload.action_items|default:None %}
+{% if actions %}
+<table>
+    <thead>
+        <tr>
+            <th style="width: 10%;">Ref</th>
+            <th style="width: 35%;">Action Item</th>
+            <th style="width: 20%;">Owner</th>
+            <th style="width: 15%;">Status</th>
+            <th style="width: 20%;">Last Updated</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ai in actions %}
+        <tr class="action-row">
+            <td style="font-family: monospace; font-size: 9pt;">{{ ai.reference|default:"—" }}</td>
+            <td>{{ ai.title|default:"—" }}</td>
+            <td>{{ ai.owner_name|default:ai.owner|default:"—" }}</td>
+            <td>{{ ai.status_label|default:ai.status|default:"—" }}</td>
+            <td>{{ ai.updated_at|default:ai.last_updated|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p><em>No statuses recorded.</em></p>
+{% endif %}
+{% endwith %}
+
+<h2>10. Sales Performance</h2>
+{% with sales=minutes.sales_data|default:minutes.sales_performance|default:None %}
+{% if sales %}
+<table>
+    <tbody>
+        <tr>
+            <th style="width: 20%;">Reporting Period</th>
+            <td style="width: 30%;">{{ sales.period_name|default:"—" }}</td>
+            <th style="width: 20%;">Currency</th>
+            <td style="width: 30%;">{{ sales.currency|default:"PHP" }}</td>
+        </tr>
+        <tr>
+            <th>Revenue Target</th>
+            <td class="money">{% if sales.revenue_target %}{% currency_cell sales.revenue_target sales.currency %}{% else %}—{% endif %}</td>
+            <th>Revenue Actual</th>
+            <td class="money">{% if sales.revenue_actual %}{% currency_cell sales.revenue_actual sales.currency %}{% else %}—{% endif %}</td>
+        </tr>
+        <tr>
+            <th>Revenue % Achieved</th>
+            <td>{{ sales.revenue_pct|default:"0"|percentage }}</td>
+            <th>Revenue Deficit</th>
+            <td class="money{% if sales.revenue_deficit and sales.revenue_deficit < 0 %} negative{% endif %}">{% if sales.revenue_deficit is not None %}{% currency_cell sales.revenue_deficit sales.currency signed=True %}{% else %}—{% endif %}</td>
+        </tr>
+        <tr>
+            <th>Profit Target</th>
+            <td class="money">{% if sales.profit_target %}{% currency_cell sales.profit_target sales.currency %}{% else %}—{% endif %}</td>
+            <th>Profit Actual</th>
+            <td class="money">{% if sales.profit_actual is not None %}{% currency_cell sales.profit_actual sales.currency %}{% else %}—{% endif %}</td>
+        </tr>
+        <tr>
+            <th>Profit Margin</th>
+            <td>{{ sales.margin_pct|default:"0"|percentage }}</td>
+            <th>Orders Actual</th>
+            <td>{{ sales.orders_actual|default:"—" }}</td>
+        </tr>
+        <tr>
+            <th>Deliveries Achieved</th>
+            <td>{{ sales.deliveries_achieved|default:"—" }}</td>
+            <th>On-Time %</th>
+            <td>{{ sales.on_time_pct|default:"0"|percentage }}</td>
+        </tr>
+    </tbody>
+</table>
+
+{% if sales.group_rows or sales.groups %}
+<h3>Sales Performance by Group</h3>
+<table>
+    <thead>
+        <tr>
+            <th style="width: 18%;">Group Code</th>
+            <th style="width: 14%;" class="money">Rev Target</th>
+            <th style="width: 14%;" class="money">Rev Actual</th>
+            <th style="width: 10%;">Rev %</th>
+            <th style="width: 14%;" class="money">Rev Deficit</th>
+            <th style="width: 14%;" class="money">Profit Actual</th>
+            <th style="width: 8%;">Orders</th>
+            <th style="width: 8%;">Deliveries</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for g in sales.group_rows|default:sales.groups %}
+        <tr>
+            <td><strong>{{ g.group_code|default:g.code|default:g.group|default:"—" }}</strong></td>
+            <td class="money">{% if g.revenue_target %}{% currency_cell g.revenue_target sales.currency %}{% else %}—{% endif %}</td>
+            <td class="money">{% if g.revenue_actual %}{% currency_cell g.revenue_actual sales.currency %}{% else %}—{% endif %}</td>
+            <td>{{ g.revenue_pct|default:"0"|percentage }}</td>
+            <td class="money{% if g.revenue_deficit and g.revenue_deficit < 0 %} negative{% endif %}">{% if g.revenue_deficit is not None %}{% currency_cell g.revenue_deficit sales.currency signed=True %}{% else %}—{% endif %}</td>
+            <td class="money{% if g.profit_actual and g.profit_actual < 0 %} negative{% endif %}">{% if g.profit_actual is not None %}{% currency_cell g.profit_actual sales.currency %}{% else %}—{% endif %}</td>
+            <td>{{ g.orders_actual|default:g.orders|default:"—" }}</td>
+            <td>{{ g.deliveries_achieved|default:g.deliveries|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% else %}
+<p><em>No sales performance data attached to this meeting.</em></p>
+{% endif %}
+{% endwith %}
+
+<h2>11. Department Updates</h2>
+{% with depts=minutes.department_updates|default:minutes.departments|default:None agenda=minutes.agenda_items|default:minutes.agenda_sections|default:None %}
+{% if agenda %}
+<table>
+    <thead>
+        <tr>
+            <th style="width: 25%;">Department</th>
+            <th style="width: 35%;">Agenda Item</th>
+            <th style="width: 20%;">Owner</th>
+            <th style="width: 20%;">Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in agenda %}
+        {% if item.department_name or item.department %}
+        <tr>
+            <td><strong>{{ item.department_name|default:item.department|default:"—" }}</strong></td>
+            <td>{{ item.title|default:"—" }}</td>
+            <td>{{ item.owner_name|default:item.owner|default:"—" }}</td>
+            <td>{{ item.item_status_label|default:item.item_status|default:"—" }}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+    </tbody>
+</table>
+{% elif depts %}
+<table>
+    <thead>
+        <tr>
+            <th style="width: 25%;">Department</th>
+            <th style="width: 55%;">Update Summary</th>
+            <th style="width: 20%;">Head / Contributor</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for d in depts %}
+        <tr>
+            <td><strong>{{ d.department_name|default:d.name|default:"—" }}</strong></td>
+            <td>{{ d.update_summary|default:d.summary|default:d.notes|default:"—" }}</td>
+            <td>{{ d.head_name|default:d.contributor|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p><em>No department updates on file.</em></p>
+{% endif %}
+{% endwith %}
+
+<h2>12. Status History</h2>
+{% with history=minutes.status_history|default:snapshot.payload.status_history|default:None %}
+{% if history %}
+<table>
+    <thead>
+        <tr>
+            <th style="width: 8%;">#</th>
+            <th style="width: 22%;">Timestamp</th>
+            <th style="width: 20%;">From Status</th>
+            <th style="width: 20%;">To Status</th>
+            <th style="width: 30%;">Transitioned By</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for h in history %}
+        <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ h.transitioned_at|default:h.timestamp|default:"—" }}</td>
+            <td>{{ h.from_status|default:"—" }}</td>
+            <td><strong>{{ h.to_status|default:"—" }}</strong></td>
+            <td>{{ h.transitioned_by|default:h.user|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p><em>No status history entries on snapshot payload.</em></p>
+{% endif %}
+{% endwith %}
+
+<h2>13. Approval Information</h2>
+{% with approval=minutes.approval_meta|default:minutes.approval_metadata|default:None %}
+<table>
+    <tbody>
+        <tr>
+            <th style="width: 25%;">Snapshot Version</th>
+            <td style="width: 25%;">{{ minutes.version|default:snapshot.payload.version|default:"v"|add:snapshot.version|default:"—" }}</td>
+            <th style="width: 25%;">Trigger</th>
+            <td style="width: 25%;">{{ snapshot.get_trigger_display|default:snapshot.trigger|default:"—" }}</td>
+        </tr>
+        <tr>
+            <th>Snapshot Created At</th>
+            <td>{{ snapshot.created_at|date:"Y-m-d H:i:s"|default:"—" }}</td>
+            <th>Payload Format</th>
+            <td><span class="badge badge-success">Immutable &middot; JSON</span></td>
+        </tr>
+        <tr>
+            <th>Approved At</th>
+            <td>
+                {% if snapshot.approved_at %}{{ snapshot.approved_at|date:"Y-m-d H:i:s" }}
+                {% elif approval and approval.approved_at %}{{ approval.approved_at }}
+                {% else %}<em>Pending</em>{% endif %}
+            </td>
+            <th>Approved By</th>
+            <td>
+                {% if snapshot.approved_by %}{{ snapshot.approved_by.get_display_name|default:snapshot.approved_by }}
+                {% elif approval and approval.approved_by_name %}{{ approval.approved_by_name }}
+                {% else %}<em>—</em>{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <th>Published At</th>
+            <td>
+                {% if snapshot.published_at %}{{ snapshot.published_at|date:"Y-m-d H:i:s" }}
+                {% elif approval and approval.published_at %}{{ approval.published_at }}
+                {% else %}<em>—</em>{% endif %}
+            </td>
+            <th>Published By</th>
+            <td>
+                {% if snapshot.published_by %}{{ snapshot.published_by.get_display_name|default:snapshot.published_by }}
+                {% elif approval and approval.published_by_name %}{{ approval.published_by_name }}
+                {% else %}<em>—</em>{% endif %}
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="approval-block">
+    <div class="sig-col">
+        <span class="label">Prepared by (Secretary)</span>
+        <div style="height: 28pt;"></div>
+        <div>Name / Signature / Date</div>
+    </div>
+    <div class="sig-col">
+        <span class="label">Reviewed by (Chairperson)</span>
+        <div style="height: 28pt;"></div>
+        <div>Name / Signature / Date</div>
+    </div>
+    <div class="sig-col">
+        <span class="label">Approved by (Management)</span>
+        <div style="height: 28pt;"></div>
+        <div>Name / Signature / Date</div>
+    </div>
+</div>
+{% endwith %}
+
+<h2>14. Confidentiality Notice</h2>
+<div class="confidential-notice">
+    {% if confidential_notice %}
+    {{ confidential_notice }}
+    {% else %}
+    <strong>CONFIDENTIAL</strong> &mdash; This document and its contents are the property of {{ company|default:"MIMOM" }} and are intended solely for the use of authorized meeting attendees and designated management personnel.
+    No part of this document may be reproduced, distributed, or disclosed to third parties without the prior written consent of the {{ company|default:"MIMOM" }} Management.
+    Approved meeting minute snapshots are immutable records; any corrections require a formally-versioned re-approval cycle.
+    {% endif %}
+</div>
+
+{% endblock report_content %}
+
+{% block report_footer %}
+<div class="doc-footer">
+    <div class="confidential-notice">
+        {{ confidential_notice|default:"CONFIDENTIAL — For authorized recipients only. Do not distribute or reproduce without written approval." }}
+    </div>
+    <div style="margin-top: 8pt; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4pt;">
+        <span>
+            <strong>{{ company|default:"MIMOM" }}</strong> &middot;
+            {{ site|default:"Management Meeting Minutes Intranet" }}
+            {% if snapshot %}&middot; Snapshot v{{ snapshot.version }} (immutable){% endif %}
+        </span>
+        <span>
+            {% if generated_at %}Generated: {{ generated_at|date:"Y-m-d H:i:s" }}{% endif %}
+        </span>
+    </div>
+</div>
+{% endblock report_footer %}

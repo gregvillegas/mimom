@@ -2,9 +2,11 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from apps.accounts.models import Department
+from apps.action_items.models import ActionItem
 from apps.meetings.models import (
     ITEM_STATUS_CHOICES,
     NON_EDITABLE_STATUSES,
+    SECTION_TYPE_CHOICES,
     STATUS_CHOICES,
     AgendaCategory,
     AgendaItem,
@@ -346,3 +348,113 @@ class AgendaItemAttachmentForm(forms.ModelForm):
     def __init__(self, *args, by_user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.by_user = by_user
+
+
+class MinutesEditorForm(forms.ModelForm):
+    class Meta:
+        model = Meeting
+        fields = ["notes"]
+        widgets = {
+            "notes": forms.Textarea(attrs={"class": "form-control", "rows": 8}),
+        }
+        labels = {
+            "notes": "Meeting Minutes / General Notes",
+        }
+
+
+class DiscussionDecisionInlineForm(forms.ModelForm):
+    class Meta:
+        model = AgendaItem
+        fields = [
+            "discussion",
+            "decision",
+            "item_status",
+            "owner",
+            "department",
+            "is_confidential",
+            "notes",
+        ]
+        widgets = {
+            "discussion": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "decision": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "notes": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "owner": forms.Select(attrs={"class": "form-select"}),
+            "department": forms.Select(attrs={"class": "form-select"}),
+            "item_status": forms.Select(attrs={"class": "form-select"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        self.fields["owner"].queryset = User.objects.filter(is_active=True).order_by("username")
+        self.fields["department"].queryset = Department.objects.filter(is_active=True).order_by(
+            "name"
+        )
+        self.fields["item_status"].choices = ITEM_STATUS_CHOICES
+
+
+class ReturnForCorrectionForm(forms.Form):
+    reason = forms.CharField(
+        required=True,
+        label="Return Reason (required)",
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+    )
+    section_types = forms.MultipleChoiceField(
+        choices=SECTION_TYPE_CHOICES,
+        required=False,
+        label="Affected Sections (optional)",
+        widget=forms.SelectMultiple(attrs={"class": "form-select", "size": 7}),
+    )
+    management_remarks = forms.CharField(
+        required=False,
+        label="Management Remarks",
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+    )
+
+
+class DateLocalInputMinutes(forms.DateInput):
+    input_type = "date"
+
+    def __init__(self, attrs=None):
+        default = {"class": "form-control", "placeholder": "YYYY-MM-DD"}
+        if attrs:
+            default.update(attrs)
+        super().__init__(attrs=default)
+
+
+class ActionItemCreateFromMinutesForm(forms.ModelForm):
+    class Meta:
+        model = ActionItem
+        fields = [
+            "title",
+            "description",
+            "owner",
+            "priority",
+            "due_date",
+        ]
+        widgets = {
+            "title": forms.TextInput(attrs={"class": "form-control"}),
+            "description": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "owner": forms.Select(attrs={"class": "form-select"}),
+            "priority": forms.Select(attrs={"class": "form-select"}),
+            "due_date": DateLocalInputMinutes(),
+        }
+
+    def __init__(self, *args, source_meeting=None, source_agenda_item=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        self.fields["owner"].queryset = User.objects.filter(is_active=True).order_by("username")
+        self._source_meeting = source_meeting
+        self._source_agenda_item = source_agenda_item
+        if source_meeting is not None:
+            self.instance.source_meeting = source_meeting
+        if source_agenda_item is not None:
+            self.instance.source_agenda_item = source_agenda_item
+            if source_agenda_item.department_id and not self.instance.department_id:
+                self.instance.department_id = source_agenda_item.department_id
+            if source_agenda_item.owner_id and not self.instance.owner_id:
+                self.initial.setdefault("owner", source_agenda_item.owner_id)

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{% block page_title %}{{ report_label|default:"Report" }} | {{ company|default:"MIMOM" }}{% endblock %}</title>
+    <style>
+{% if print_css %}{{ print_css|safe }}{% else %}
+@page {
+    size: A4 landscape;
+    margin: 1.5cm 1.2cm 1.8cm 1.2cm;
+    @bottom-right {
+        content: "Page " counter(page) " of " counter(pages);
+        font-family: Georgia, serif;
+        font-size: 9pt;
+        color: #555;
+    }
+    @bottom-left {
+        content: "CONFIDENTIAL";
+        font-family: Georgia, serif;
+        font-size: 8pt;
+        color: #888;
+    }
+}
+html, body { counter-reset: pages; }
+body {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 10pt;
+    line-height: 1.35;
+    color: #111;
+    background: #fff;
+    margin: 0;
+    padding: 0;
+}
+h1, h2, h3, h4 {
+    page-break-after: avoid;
+    font-family: Georgia, serif;
+    color: #1a1a1a;
+}
+h1 {
+    font-size: 18pt;
+    border-bottom: 2px solid #1f3a68;
+    padding-bottom: 4pt;
+    margin-bottom: 6pt;
+}
+h2 {
+    font-size: 13pt;
+    margin-top: 14pt;
+    margin-bottom: 6pt;
+    color: #1f3a68;
+    border-bottom: 1px solid #cfd8e8;
+    padding-bottom: 2pt;
+}
+h3 {
+    font-size: 11pt;
+    margin-top: 10pt;
+    margin-bottom: 4pt;
+}
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 6pt 0 10pt 0;
+    font-size: 9.5pt;
+}
+thead { display: table-header-group; }
+tfoot { display: table-footer-group; }
+thead th {
+    background-color: #1f3a68;
+    color: #ffffff;
+    font-weight: bold;
+    padding: 6pt 8pt;
+    border: 1px solid #152a4b;
+    text-align: left;
+}
+tbody td, tfoot td {
+    padding: 5pt 8pt;
+    border: 1px solid #b8c4d8;
+    vertical-align: top;
+}
+tbody tr:nth-child(even) td { background-color: #f5f7fb; }
+tbody tr.action-row { page-break-inside: avoid; }
+tbody tr.subtotal td, tfoot td {
+    background-color: #e6ecf7;
+    font-weight: bold;
+}
+tbody tr.danger td { background-color: #fce4e4 !important; }
+.money, .num {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.negative { color: #9b2c2c; }
+.doc-header {
+    border-bottom: 3px solid #1f3a68;
+    padding-bottom: 8pt;
+    margin-bottom: 14pt;
+}
+.doc-header .company {
+    font-size: 14pt;
+    font-weight: bold;
+    color: #1f3a68;
+    letter-spacing: 0.5pt;
+}
+.doc-header .title {
+    font-size: 16pt;
+    font-weight: bold;
+    margin-top: 4pt;
+}
+.doc-header .meta {
+    font-size: 9pt;
+    color: #444;
+    margin-top: 6pt;
+}
+.doc-header .meta span {
+    display: inline-block;
+    margin-right: 18pt;
+}
+.doc-footer {
+    margin-top: 24pt;
+    padding-top: 10pt;
+    border-top: 1px solid #cfd8e8;
+    font-size: 8.5pt;
+    color: #555;
+}
+.confidential-notice {
+    margin-top: 12pt;
+    padding: 6pt 10pt;
+    background-color: #fdf2f2;
+    border: 1px solid #e3b4b4;
+    color: #7a1f1f;
+    font-size: 9pt;
+}
+.approval-block {
+    margin-top: 20pt;
+    display: flex;
+    gap: 24pt;
+}
+.approval-block .sig-col {
+    flex: 1;
+    border-top: 1px solid #333;
+    padding-top: 4pt;
+    font-size: 9pt;
+}
+.approval-block .sig-col .label {
+    font-weight: bold;
+    display: block;
+}
+.section-attendance { margin: 6pt 0; }
+.section-attendance .attendee-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4pt 14pt;
+    font-size: 9.5pt;
+}
+ul, ol {
+    margin: 4pt 0 6pt 20pt;
+    padding: 0;
+}
+li { margin-bottom: 2pt; }
+p { margin: 3pt 0; }
+strong, b { font-weight: bold; }
+em, i { font-style: italic; }
+.br {
+    display: block;
+    content: "";
+    margin: 2pt 0;
+}
+.badge {
+    display: inline-block;
+    padding: 2pt 6pt;
+    border-radius: 3pt;
+    font-size: 8.5pt;
+    font-weight: bold;
+}
+.badge-danger {
+    background-color: #dc3545;
+    color: #fff;
+}
+.badge-warning {
+    background-color: #ffc107;
+    color: #000;
+}
+.badge-success {
+    background-color: #198754;
+    color: #fff;
+}
+.badge-secondary {
+    background-color: #6c757d;
+    color: #fff;
+}
+.badge-info {
+    background-color: #0dcaf0;
+    color: #000;
+}
+@media print {
+    .no-print { display: none !important; }
+}
+{% endif %}
+    </style>
+</head>
+<body>
+
+{% block report_header %}
+<div class="doc-header">
+    <div class="company">{{ company|default:"MIMOM" }}</div>
+    <div class="title">{{ document_title|default:report_label|default:"Management Report" }}</div>
+    <div class="meta">
+        {% if reference %}<span><strong>Ref:</strong> {{ reference }}</span>{% endif %}
+        {% if meeting_date %}<span><strong>Meeting:</strong> {{ meeting_date }}</span>{% endif %}
+        {% if reporting_cutoff %}<span><strong>Cut-off:</strong> {{ reporting_cutoff }}</span>{% endif %}
+        {% if status %}<span><strong>Status:</strong> {{ status }}</span>{% endif %}
+        {% if version %}<span><strong>Version:</strong> {{ version }}</span>{% endif %}
+    </div>
+    {% if attendance_summary %}
+    <div class="section-attendance">
+        <h4>Attendance Summary</h4>
+        <div class="attendee-grid">
+            {% for a in attendance_summary %}
+            <div>{{ a }}</div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    <div class="meta">
+        {% if generated_at %}<span><strong>Generated:</strong> {{ generated_at|date:"Y-m-d H:i:s" }}</span>{% endif %}
+        <span><strong>Page:</strong> <span class="page-counter">1</span></span>
+    </div>
+</div>
+{% endblock report_header %}
+
+{% block report_content %}{% endblock report_content %}
+
+{% block report_footer %}
+<div class="doc-footer">
+    {% if confidential_notice %}
+    <div class="confidential-notice">{{ confidential_notice }}</div>
+    {% endif %}
+    <div style="margin-top: 8pt; display: flex; justify-content: space-between;">
+        <span>{{ company|default:"MIMOM" }} &middot; {{ site|default:"Management Meeting Minutes Intranet" }}</span>
+        <span>Generated: {% now "Y-m-d H:i:s" %}</span>
+    </div>
+</div>
+{% endblock report_footer %}
+
+</body>
+</html>

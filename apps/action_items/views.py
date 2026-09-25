@@ -138,6 +138,7 @@ class ActionItemListView(LoginRequiredMixin, ActionItemQuerysetHelpers, ListView
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        ctx.setdefault("heading", "Action Items")
         ctx["status_choices"] = STATUS_CHOICES
         ctx["priority_choices"] = PRIORITY_CHOICES
         ctx["departments"] = Department.objects.filter(is_active=True).order_by("name")

@@ -1,0 +1,183 @@
+{% extends 'reports/base_printable.html' %}
+
+{% block page_title %}Authorized Audit Report | {{ company|default:"MIMOM" }}{% endblock %}
+
+{% block report_header %}
+<div class="doc-header">
+    <div class="company">{{ company|default:"MIMOM" }}</div>
+    <div class="title">Authorized Audit Report</div>
+    <div class="meta">
+        <span><strong>Document:</strong> AUDIT-AUTHORIZED-LOG</span>
+        {% if from_date %}<span><strong>From:</strong> {{ from_date|date:"Y-m-d" }}</span>{% endif %}
+        {% if to_date %}<span><strong>To:</strong> {{ to_date|date:"Y-m-d" }}</span>{% endif %}
+        <span><strong>Version:</strong> 1.0</span>
+    </div>
+    <div class="meta">
+        {% if generated_at %}<span><strong>Generated:</strong> {{ generated_at|date:"Y-m-d H:i:s" }}</span>
+        {% else %}<span><strong>Generated:</strong> {% now "Y-m-d H:i:s" %}</span>{% endif %}
+        <span><strong>Events:</strong> {{ audit_rows|length|default:0 }}</span>
+    </div>
+</div>
+{% endblock report_header %}
+
+{% block report_content %}
+
+<h2>Report Parameters</h2>
+<table>
+    <tbody>
+        <tr>
+            <th style="width: 25%;">Company</th>
+            <td style="width: 25%;">{{ company|default:"MIMOM" }}</td>
+            <th style="width: 25%;">Report Type</th>
+            <td style="width: 25%;">Authorized Audit Log Report</td>
+        </tr>
+        <tr>
+            <th>From Date</th>
+            <td>
+                {% if from_date %}{{ from_date|date:"Y-m-d" }}{% else %}
+                <em>Default (30 days back)</em>
+                {% endif %}
+            </td>
+            <th>To Date</th>
+            <td>
+                {% if to_date %}{{ to_date|date:"Y-m-d" }}{% else %}
+                <em>Today ({% now "Y-m-d" %})</em>
+                {% endif %}
+            </td>
+        </tr>
+        <tr>
+            <th>Event Count</th>
+            <td class="num"><strong>{{ audit_rows|length|default:0 }}</strong></td>
+            <th>Report Generated</th>
+            <td>{% now "Y-m-d H:i:s" %}</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Audit Events</h2>
+<table>
+    <thead>
+        <tr>
+            <th style="width: 4%;">#</th>
+            <th style="width: 16%;">Timestamp</th>
+            <th style="width: 17%;">Record Type</th>
+            <th style="width: 15%;">Action</th>
+            <th style="width: 6%;">Rec ID</th>
+            <th style="width: 16%;">User</th>
+            <th style="width: 8%;">IP Address</th>
+            <th style="width: 24%;">Reason</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for log in audit_rows %}
+        <tr class="action-row">
+            <td>{{ forloop.counter }}</td>
+            <td>
+                {% if log.created_at %}
+                    {{ log.created_at|date:"Y-m-d" }}<br>
+                    <span style="font-size: 8.5pt; color: #555;">{{ log.created_at|date:"H:i:s" }}</span>
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+            <td>
+                <code style="font-size: 8.5pt;">{{ log.record_type|default:"—" }}</code>
+            </td>
+            <td>
+                <span class="badge
+                    {% if log.action == 'CREATE' or log.action == 'APPROVE' or log.action == 'PUBLISH' %}badge-success
+                    {% elif log.action == 'UPDATE' or log.action == 'EDIT' or log.action == 'SUBMIT' %}badge-warning
+                    {% elif log.action == 'DELETE' or log.action == 'CANCEL' or log.action == 'ARCHIVE' %}badge-danger
+                    {% elif log.action == 'EXPORT' or log.action == 'DOWNLOAD' or log.action == 'VIEW' %}badge-info
+                    {% elif log.action == 'LOGIN' or log.action == 'AUTH' %}badge-secondary
+                    {% else %}badge-secondary{% endif %}">
+                    {% if log.get_action_display %}{{ log.get_action_display }}
+                    {% else %}{{ log.action|default:"—" }}{% endif %}
+                </span>
+            </td>
+            <td style="font-size: 8.5pt;">
+                {% if log.record_id %}{{ log.record_id }}{% else %}—{% endif %}
+            </td>
+            <td>
+                {% if log.user %}
+                    <strong>{{ log.user.get_display_name|default:log.user|truncatechars:22 }}</strong>
+                    {% if log.target_user and log.target_user_id != log.user_id %}
+                    <div style="font-size: 8.5pt; color: #555;">
+                        &rarr; {{ log.target_user.get_display_name|default:log.target_user|truncatechars:20 }}
+                    </div>
+                    {% endif %}
+                {% else %}
+                    <em>System</em>
+                {% endif %}
+            </td>
+            <td style="font-size: 8.5pt; font-family: monospace;">
+                {{ log.ip_address|default:"—" }}
+            </td>
+            <td style="font-size: 9pt;">
+                {% if log.reason %}{{ log.reason|truncatechars:80 }}{% else %}<em class="text-muted">No reason provided.</em>{% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="8" style="text-align: center; padding: 24pt;">
+                <em>No audit events match the selected date range.</em>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Action Summary</h2>
+<table>
+    <thead>
+        <tr>
+            <th style="width: 40%;">Action Type</th>
+            <th style="width: 20%;" class="num">Count</th>
+            <th style="width: 40%;">Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><span class="badge badge-success">CREATE / APPROVE / PUBLISH</span></td>
+            <td class="num">
+                {% for log in audit_rows %}{% if log.action in 'CREATE,APPROVE,PUBLISH' %}1{% endif %}{% endfor %}
+            </td>
+            <td>New records, approvals, publications.</td>
+        </tr>
+        <tr>
+            <td><span class="badge badge-warning">UPDATE / SUBMIT / EDIT</span></td>
+            <td class="num">
+                {% for log in audit_rows %}{% if log.action in 'UPDATE,SUBMIT,EDIT,RESUBMIT' %}1{% endif %}{% endfor %}
+            </td>
+            <td>Modifications and submissions.</td>
+        </tr>
+        <tr>
+            <td><span class="badge badge-danger">DELETE / CANCEL / ARCHIVE</span></td>
+            <td class="num">
+                {% for log in audit_rows %}{% if log.action in 'DELETE,CANCEL,ARCHIVE,REVOKE,RETURN' %}1{% endif %}{% endfor %}
+            </td>
+            <td>Removals, cancellations, returns.</td>
+        </tr>
+        <tr>
+            <td><span class="badge badge-info">EXPORT / VIEW / DOWNLOAD</span></td>
+            <td class="num">
+                {% for log in audit_rows %}{% if log.action in 'EXPORT,VIEW,DOWNLOAD,PRINT' %}1{% endif %}{% endfor %}
+            </td>
+            <td>Reports, exports, read access.</td>
+        </tr>
+        <tr>
+            <td><span class="badge badge-secondary">AUTH / LOGIN / ACCESS</span></td>
+            <td class="num">
+                {% for log in audit_rows %}{% if log.action in 'LOGIN,AUTH,ACCESS,LOGOUT' %}1{% endif %}{% endfor %}
+            </td>
+            <td>Authentication events.</td>
+        </tr>
+        <tr class="subtotal">
+            <td><strong>Total Events</strong></td>
+            <td class="num"><strong>{{ audit_rows|length|default:0 }}</strong></td>
+            <td></td>
+        </tr>
+    </tbody>
+</table>
+
+{% endblock report_content %}

@@ -1,0 +1,96 @@
+{% extends 'reports/base_printable.html' %}
+
+{% block page_title %}Action Item Register | {{ company|default:"MIMOM" }}{% endblock %}
+
+{% block report_header %}
+<div class="doc-header">
+    <div class="company">{{ company|default:"MIMOM" }}</div>
+    <div class="title">{{ view_title|default:"Action Item Register" }}</div>
+    <div class="meta">
+        <span><strong>Document:</strong> AI-REGISTER-FULL</span>
+        {% if reporting_cutoff %}<span><strong>Cut-off:</strong> {{ reporting_cutoff }}</span>{% endif %}
+        <span><strong>Status:</strong> Complete Register</span>
+        <span><strong>Version:</strong> 1.0</span>
+    </div>
+    <div class="meta">
+        {% if generated_at %}<span><strong>Generated:</strong> {{ generated_at|date:"Y-m-d H:i:s" }}</span>
+        {% else %}<span><strong>Generated:</strong> {% now "Y-m-d H:i:s" %}</span>{% endif %}
+        <span><strong>Records:</strong> {{ action_items|length|default:0 }}</span>
+    </div>
+</div>
+{% endblock report_header %}
+
+{% block report_content %}
+
+<h2>Summary</h2>
+<table>
+    <tbody>
+        <tr>
+            <th style="width: 25%;">Company</th>
+            <td style="width: 25%;">{{ company|default:"MIMOM" }}</td>
+            <th style="width: 25%;">Report Type</th>
+            <td style="width: 25%;">{{ view_title|default:"Action Item Register" }}</td>
+        </tr>
+        <tr>
+            <th>Total Records</th>
+            <td>{{ action_items|length|default:0 }}</td>
+            <th>Report Date</th>
+            <td>{% now "Y-m-d" %}</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Action Item Register</h2>
+<table>
+    <thead>
+        <tr>
+            <th style="width: 5%;">#</th>
+            <th style="width: 13%;">Reference</th>
+            <th style="width: 24%;">Title</th>
+            <th style="width: 13%;">Owner</th>
+            <th style="width: 12%;">Department</th>
+            <th style="width: 10%;">Due Date</th>
+            <th style="width: 10%;">Status</th>
+            <th style="width: 7%;">Priority</th>
+            <th style="width: 6%;">Source Meeting</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in action_items %}
+        <tr class="action-row">
+            <td>{{ forloop.counter }}</td>
+            <td style="font-family: monospace; font-size: 9pt;">{{ item.reference|default:"—" }}</td>
+            <td>
+                <strong>{{ item.title|default:"—" }}</strong>
+                {% if item.description %}
+                <div style="font-size: 8.5pt; color: #555; margin-top: 2pt;">
+                    {{ item.description|truncatewords:25|default:"" }}
+                </div>
+                {% endif %}
+            </td>
+            <td>
+                {% if item.owner %}{{ item.owner.get_display_name|default:item.owner }}{% else %}<em>Unassigned</em>{% endif %}
+            </td>
+            <td>{{ item.department.name|default:item.department|default:"—" }}</td>
+            <td>{% if item.due_date %}{{ item.due_date|date:"Y-m-d" }}{% else %}<em>—</em>{% endif %}</td>
+            <td>
+                {% if item.get_status_display %}{{ item.get_status_display }}{% else %}{{ item.status|default:"—" }}{% endif %}
+            </td>
+            <td>
+                {% if item.get_priority_display %}{{ item.get_priority_display }}{% else %}{{ item.priority|default:"—" }}{% endif %}
+            </td>
+            <td style="font-size: 8.5pt;">
+                {% if item.source_meeting %}{{ item.source_meeting.reference|default:item.source_meeting|truncatechars:12 }}{% else %}—{% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="9" style="text-align: center; padding: 20pt;">
+                <em>No action items in register.</em>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock report_content %}

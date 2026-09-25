@@ -1,0 +1,185 @@
+{% extends 'reports/base_printable.html' %}
+{% load sales_formatting %}
+
+{% block page_title %}Weekly Commitments | {{ company|default:"MIMOM" }}{% endblock %}
+
+{% block report_header %}
+<div class="doc-header">
+    <div class="company">{{ company|default:"MIMOM" }}</div>
+    <div class="title">Weekly Commitments Report</div>
+    <div class="meta">
+        {% if period %}<span><strong>Period:</strong> {{ period.name|default:"—" }}</span>{% endif %}
+        {% if snapshot and snapshot.group %}<span><strong>Group:</strong> {{ snapshot.group.code|default:snapshot.group.name|default:"—" }}</span>{% endif %}
+        <span><strong>Document:</strong> SALES-WEEKLY-COMMITMENTS</span>
+        <span><strong>Version:</strong> 1.0</span>
+    </div>
+    <div class="meta">
+        {% if generated_at %}<span><strong>Generated:</strong> {{ generated_at|date:"Y-m-d H:i:s" }}</span>
+        {% else %}<span><strong>Generated:</strong> {% now "Y-m-d H:i:s" %}</span>{% endif %}
+        {% if period %}<span><strong>Weeks:</strong> {{ period.weeks_count|default:"—" }}</span>{% endif %}
+    </div>
+</div>
+{% endblock report_header %}
+
+{% block report_content %}
+
+<h2>Report Scope</h2>
+<table>
+    <tbody>
+        <tr>
+            <th style="width: 20%;">Reporting Period</th>
+            <td style="width: 30%;">
+                {% if period %}{{ period.name|default:"—" }}{% elif snapshot and snapshot.period %}{{ snapshot.period.name|default:"—" }}{% else %}—{% endif %}
+            </td>
+            <th style="width: 20%;">Currency</th>
+            <td style="width: 30%;">
+                {% if period %}{{ period.get_currency_display|default:period.currency|default:"PHP" }}
+                {% elif snapshot and snapshot.period %}{{ snapshot.period.get_currency_display|default:snapshot.period.currency|default:"PHP" }}
+                {% else %}PHP{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <th>Start Date</th>
+            <td>
+                {% if period and period.start_date %}{{ period.start_date }}
+                {% elif snapshot and snapshot.period and snapshot.period.start_date %}{{ snapshot.period.start_date }}
+                {% else %}—{% endif %}
+            </td>
+            <th>End Date</th>
+            <td>
+                {% if period and period.end_date %}{{ period.end_date }}
+                {% elif snapshot and snapshot.period and snapshot.period.end_date %}{{ snapshot.period.end_date }}
+                {% else %}—{% endif %}
+            </td>
+        </tr>
+        {% if snapshot and snapshot.group %}
+        <tr>
+            <th>Sales Group</th>
+            <td>{{ snapshot.group.code|default:"" }} / {{ snapshot.group.name|default:"—" }}</td>
+            <th>Team</th>
+            <td>
+                {% if snapshot.group.team %}{{ snapshot.group.team.name|default:snapshot.group.team|default:"—" }}{% else %}—{% endif %}
+            </td>
+        </tr>
+        {% endif %}
+    </tbody>
+</table>
+
+{% with currency=period.get_currency_display|default:period.currency|default:"PHP" %}
+
+{% if snapshot %}
+
+    {% with weeks=weekly_rows.weeks|default:weekly_rows %}
+    <h2>Weekly Commitments &mdash; {{ snapshot.group.code|default:snapshot.group.name|default:"Group" }}</h2>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 8%;">Week</th>
+                <th style="width: 16%;" class="money">Committed Revenue</th>
+                <th style="width: 16%;" class="money">Actual Revenue</th>
+                <th style="width: 10%;">Rev %</th>
+                <th style="width: 16%;" class="money">Committed Profit</th>
+                <th style="width: 16%;" class="money">Actual Profit</th>
+                <th style="width: 10%;">Prof %</th>
+                <th style="width: 18%;">Notes / Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for w in weeks %}
+            {% with wn=w.week_number|default:forloop.counter %}
+            <tr class="action-row">
+                <td><strong>W{{ wn }}</strong></td>
+                <td class="money">{% if w.committed_revenue is not None %}{% currency_cell w.committed_revenue currency %}{% else %}—{% endif %}</td>
+                <td class="money">{% if w.actual_revenue is not None %}{% currency_cell w.actual_revenue currency %}{% else %}—{% endif %}</td>
+                <td>
+                    {% if w.committed_revenue and w.actual_revenue is not None and w.committed_revenue > 0 %}
+                        {% widthratio w.actual_revenue w.committed_revenue 100 %}%
+                    {% else %}—{% endif %}
+                </td>
+                <td class="money">{% if w.committed_profit is not None %}{% currency_cell w.committed_profit currency %}{% else %}—{% endif %}</td>
+                <td class="money{% if w.actual_profit and w.actual_profit < 0 %} negative{% endif %}">
+                    {% if w.actual_profit is not None %}{% currency_cell w.actual_profit currency %}{% else %}—{% endif %}
+                </td>
+                <td>
+                    {% if w.committed_profit and w.actual_profit is not None and w.committed_profit > 0 %}
+                        {% widthratio w.actual_profit w.committed_profit 100 %}%
+                    {% else %}—{% endif %}
+                </td>
+                <td style="font-size: 9pt;">
+                    {% if w.status %}<span class="badge badge-info">{{ w.status }}</span>{% endif %}
+                    {% if w.notes %}{{ w.notes|default:""|truncatewords:15 }}{% endif %}
+                </td>
+            </tr>
+            {% endwith %}
+            {% empty %}
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 20pt;">
+                    <em>No weekly commitment rows for this snapshot.</em>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endwith %}
+
+{% else %}
+
+    {% with period_snapshots=weekly_rows.snapshots|default:weekly_rows|default:None %}
+    {% if period_snapshots %}
+        {% for ss in period_snapshots %}
+            {% with ss_rows=ss.weekly_rows|default:ss.weeks|default:ss %}
+            <h2>Group &mdash; {{ ss.group.code|default:ss.group.name|default:"Unknown" }}</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 8%;">Week</th>
+                        <th style="width: 18%;" class="money">Committed Rev</th>
+                        <th style="width: 18%;" class="money">Actual Rev</th>
+                        <th style="width: 10%;">Rev %</th>
+                        <th style="width: 18%;" class="money">Committed Profit</th>
+                        <th style="width: 18%;" class="money">Actual Profit</th>
+                        <th style="width: 10%;">Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for w in ss_rows %}
+                    {% with wn=w.week_number|default:forloop.counter %}
+                    <tr class="action-row">
+                        <td><strong>W{{ wn }}</strong></td>
+                        <td class="money">{% if w.committed_revenue is not None %}{% currency_cell w.committed_revenue currency %}{% else %}—{% endif %}</td>
+                        <td class="money">{% if w.actual_revenue is not None %}{% currency_cell w.actual_revenue currency %}{% else %}—{% endif %}</td>
+                        <td>
+                            {% if w.committed_revenue and w.actual_revenue is not None and w.committed_revenue > 0 %}
+                                {% widthratio w.actual_revenue w.committed_revenue 100 %}%
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="money">{% if w.committed_profit is not None %}{% currency_cell w.committed_profit currency %}{% else %}—{% endif %}</td>
+                        <td class="money{% if w.actual_profit and w.actual_profit < 0 %} negative{% endif %}">
+                            {% if w.actual_profit is not None %}{% currency_cell w.actual_profit currency %}{% else %}—{% endif %}
+                        </td>
+                        <td style="font-size: 9pt;">
+                            {% if w.notes %}{{ w.notes|default:""|truncatewords:10 }}{% else %}—{% endif %}
+                        </td>
+                    </tr>
+                    {% endwith %}
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 12pt;">
+                            <em>No weekly data for {{ ss.group.code|default:ss.group.name }}.</em>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endwith %}
+        {% endfor %}
+    {% else %}
+    <p><em>No snapshots found for this reporting period.</em></p>
+    {% endif %}
+    {% endwith %}
+
+{% endif %}
+
+{% endwith %}
+
+{% endblock report_content %}

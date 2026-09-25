@@ -20,6 +20,10 @@ class AuditLog(models.Model):
     ACTION_CARRY_FORWARD = "CARRY_FORWARD"
     ACTION_LOCK = "LOCK"
     ACTION_EXPORT = "EXPORT"
+    ACTION_SUBMIT = "SUBMIT"
+    ACTION_RETURN = "RETURN"
+    ACTION_RESUBMIT = "RESUBMIT"
+    ACTION_SNAPSHOT = "SNAPSHOT"
 
     ACTION_CHOICES = [
         (ACTION_CREATE, "Create"),
@@ -38,6 +42,10 @@ class AuditLog(models.Model):
         (ACTION_CARRY_FORWARD, "Carry Forward"),
         (ACTION_LOCK, "Lock Record"),
         (ACTION_EXPORT, "Export Data"),
+        (ACTION_SUBMIT, "Submit for Review"),
+        (ACTION_RETURN, "Return for Correction"),
+        (ACTION_RESUBMIT, "Resubmit for Review"),
+        (ACTION_SNAPSHOT, "Snapshot Created"),
     ]
 
     id = models.BigAutoField(primary_key=True)

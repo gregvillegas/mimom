@@ -581,3 +581,421 @@ mobile scrolling:
 | Weekly           | Formset with `period.weeks_count` rows (extra = calculated)                                   |
 | Snapshots        | Snapshot list per group×period; button → SnapshotCreateView (meeting picker); lock icon badge |
 
+---
+
+## §13 — MINUTES SUBMISSION WORKFLOW (Phase 6)
+
+### 13a — Five Submission States
+
+Minutes submissions are tracked per-department within a meeting via the
+`MeetingMinutesSubmission` model. The lifecycle is a 5-state linear DAG with
+one correction loop (RETURNED → resubmit):
+
+```
+NOT_STARTED ──► IN_PROGRESS ──► SUBMITTED ──► ACCEPTED
+                  ▲               │
+                  │               │
+                  └── RETURNED ◄──┘
+```
+
+| State         | Meaning                                                                 |
+|---------------|-------------------------------------------------------------------------|
+| NOT_STARTED   | Department row auto-created at meeting finalisation; no edits yet.      |
+| IN_PROGRESS   | Department contributor is actively drafting the 7 minute sections.     |
+| SUBMITTED     | Draft submitted for admin/chair review; contributor views read-only.    |
+| RETURNED      | Reviewer rejected with a reason; contributor must re-edit & resubmit.   |
+| ACCEPTED      | Approved; locks all 7 sections immutable. See snapshot rules in §14.    |
+
+**Uniqueness constraint**: `MeetingMinutesSubmission.Meta.unique_together =
+(meeting, department)`. One submission row per (meeting × department) pair
+— re-submissions update the same row, they never create a new one.
+
+### 13b — MinutesSectionSpec (7 section_types)
+
+Each submission stores its free-form text against 7 typed sections via the
+`MinutesSectionSpec` lookup model. Section `order` is unique per
+`section_type`; the submission's `MeetingMinutesSection` child rows map 1:1
+to the 7 types:
+
+| #  | section_type constant     | Typical content                                                        |
+|----|---------------------------|------------------------------------------------------------------------|
+| 1  | SECTION_ATTENDANCE        | Attendance narrative / apologies list                                  |
+| 2  | SECTION_AGENDA_REVIEW     | Walkthrough of agenda items with outcomes                              |
+| 3  | SECTION_DISCUSSIONS       | Open discussion summaries per topic                                    |
+| 4  | SECTION_DECISIONS         | Binding decisions + rationale text                                     |
+| 5  | SECTION_ACTION_ITEMS      | Action items review (links via FK to ActionItem rows)                  |
+| 6  | SECTION_SALES_DATA        | Sales numbers commentary + snapshot FK link (GroupPerformanceSnapshot) |
+| 7  | SECTION_OTHER_BUSINESS    | AOB, date of next meeting, closing remarks                             |
+
+### 13c — Eight Permission Predicates
+
+All predicates live in `apps.core.permissions`. They share the pattern:
+short-circuit on `is_superuser`, require `is_authenticated AND is_active`,
+then apply role + object-level gates.
+
+| Predicate                            | Semantics                                                                                   |
+|--------------------------------------|---------------------------------------------------------------------------------------------|
+| `can_submit_minutes(user, submission)`  | Dept contributor for submission.department AND submission.status IN {IN_PROGRESS, RETURNED} |
+| `can_return_minutes(user, submission)`  | SysAdmin/MgmtAdmin/Chair AND submission.status == SUBMITTED                                |
+| `can_resubmit_minutes(user, submission)`| Dept contributor AND submission.status == RETURNED (alias for can_submit_minutes)           |
+| `can_approve_minutes(user, submission)` | SysAdmin/MgmtAdmin/Chair AND submission.status == SUBMITTED                                |
+| `can_publish_minutes(user, submission)` | SysAdmin/MgmtAdmin AND submission.status == ACCEPTED (and meeting.status in publishable)   |
+| `can_close_minutes(user, submission)`   | SysAdmin/MgmtAdmin/Chair AND submission.status == ACCEPTED AND published_at is not None    |
+| `can_reopen_minutes(user, submission)`  | SysAdmin/MgmtAdmin AND submission.status in 4 allowed source statuses (see 13h)             |
+| `can_create_snapshot(user, meeting)`    | SysAdmin/MgmtAdmin AND meeting.status == APPROVED (pre-publish gate)                       |
+
+### 13d — Service-Layer Transitions
+
+Seven transitions are exposed by `apps.meetings.minutes_services`. Each runs
+inside `transaction.atomic()`, re-reads the submission row with
+`select_for_update()`, validates the edge, enforces reason rules (below),
+and writes both `MinutesSubmissionStatusHistory` + `AuditLog(ACTION_*)`.
+
+| Service call                           | Edge                       | Audit action |
+|----------------------------------------|----------------------------|--------------|
+| `submit_for_review(submission, by_user)`      | IN_PROGRESS/RETURNED → SUBMITTED | SUBMIT       |
+| `return_for_correction(submission, by_user, reason)` | SUBMITTED → RETURNED   | RETURN       |
+| `resubmit_for_review(submission, by_user)`    | RETURNED → SUBMITTED       | RESUBMIT     |
+| `approve_minutes(submission, by_user)`        | SUBMITTED → ACCEPTED       | APPROVE      |
+| `publish_minutes(submission, by_user)`        | ACCEPTED → (sets published_at) | PUBLISH  |
+| `close_minutes(submission, by_user, reason)`  | ACCEPTED/published → (sets closed_at) | CLOSE |
+| `reopen_minutes(submission, by_user, reason)` | 4 source statuses → IN_PROGRESS  | REOPEN |
+
+### 13e — Audit Action Coverage
+
+The seven transition service calls map 1:1 to seven new `AuditLog.action`
+values (added in `audit.0005_alter_auditlog_action`):
+
+| Audit action | Triggered by              | `reason` field |
+|--------------|---------------------------|----------------|
+| SUBMIT       | submit_for_review         | optional       |
+| RETURN       | return_for_correction     | **required** (non-empty after strip) |
+| RESUBMIT     | resubmit_for_review       | optional       |
+| APPROVE      | approve_minutes           | optional       |
+| PUBLISH      | publish_minutes           | optional       |
+| CLOSE        | close_minutes             | **required** (non-empty after strip) |
+| REOPEN       | reopen_minutes            | **required** (non-empty after strip) |
+
+Additionally `create_approved_snapshot()` (§14) writes `action=PUBLISH` when
+triggered from the publish flow, and `action=MANUAL` when invoked via the
+standalone "Create snapshot" admin button.
+
+### 13f — Close Reason Required
+
+`close_minutes(submission, by_user, reason)` enforces the reason gate in
+**three** independently-true places:
+
+1. **Service layer**: `if not reason or not reason.strip(): raise ValidationError("close requires a reason")`.
+2. **Form clean()**: `MinutesCloseForm.clean()` raises the same ValidationError.
+3. **Template/UI**: the Close modal `<textarea id="id_reason" required>` has
+   the HTML5 `required` attribute so the browser blocks empty submission.
+
+### 13g — Reopen Non-Empty Reason Required
+
+`reopen_minutes(...)` mirrors the close gate with the same triple-enforcement
+(service + form.clean + HTML5 required). The reason text is stored in the
+`AuditLog.reason` column and also copied to
+`MinutesSubmissionStatusHistory.reason` for status-history viewers.
+
+### 13h — Reopen: 4 Allowed Source Statuses
+
+Re-opening is intentionally liberal on source states so admins can recover
+from mistakes, but **never** permitted from NOT_STARTED (the row must have
+entered the workflow at least once):
+
+```
+Allowed source statuses for REOPEN: {IN_PROGRESS, SUBMITTED, RETURNED, ACCEPTED}
+Forbidden source: NOT_STARTED (raises ValidationError("cannot reopen a never-started submission"))
+```
+
+Any reopen transition writes `MinutesSubmissionStatusHistory` preserving the
+pre-reopen status, and resets `published_at` / `closed_at` to `NULL` (the
+submission must go through publish/close again after re-editing).
+
+---
+
+## §14 — APPROVED MEETING SNAPSHOTS (Phase 6)
+
+### 14a — ApprovedMeetingSnapshot: 8 Payload Components
+
+`ApprovedMeetingSnapshot.payload` is a single `JSONField` that stores the
+frozen state of the meeting at snapshot-creation time. The payload is
+**always** an object with exactly 8 top-level keys. Absent keys are stored
+as `null` (never omitted); extra keys are rejected by the model's `clean()`.
+
+| #  | Key              | Content                                                                 |
+|----|------------------|-------------------------------------------------------------------------|
+| 1  | `meeting_meta`   | Title, reference, dates, location, chair FK + display name — 10 scalars |
+| 2  | `attendance`     | Array of attendee objects: user id, display_name, is_invited, is_attended, rsvp_status |
+| 3  | `agenda_items`   | Array of agendum objects (ordered by `order`): id, title, category, discussion, decision, owner, item_status, confidential |
+| 4  | `discussions`    | Array of discussion-thread objects per confidential/flagged topic — 5 fields per row |
+| 5  | `decisions`      | Array of formal decision objects: id, agenda_item_id (nullable), text, rationale, decided_by display name, decided_at |
+| 6  | `action_items`   | Array of action item objects: id, title, description, status, priority, due_date, owner_name, assignees (list of names) |
+| 7  | `sales_data`     | Object with group_ids keys, each value is the full 12-field snapshot from GroupPerformanceSnapshot for that (group, period, meeting) |
+| 8  | `status_history` | Array of MeetingStatusHistory rows up to snapshot.time: from_status, to_status, transitioned_by, reason, occurred_at |
+
+### 14b — Versioning Algorithm: Sequential next_version
+
+Each `(meeting, version)` pair is unique. The version is assigned
+**atomically inside the snapshot-create transaction** using:
+
+```
+next_version = COALESCE(
+    (SELECT MAX(version) FROM approved_meeting_snapshot WHERE meeting_id = %s),
+    0
+) + 1
+```
+
+Gaps are **forbidden**; the MAX+1 algorithm guarantees sequential integer
+versions starting at `1` for a meeting's first snapshot. Version rollback /
+reuse is impossible because (a) `ApprovedMeetingSnapshot` rows are never
+deleted (only soft-flagged via a separate `superseded_by` nullable self-FK
+that is reserved for future Phase 7+ use — it is not written to in Phase 6),
+and (b) the unique constraint in §14c would reject any reused version even
+if MAX were somehow computed wrong.
+
+### 14c — Double-Publish Guard (3 Independent Layers)
+
+Creating two snapshots for the same meeting with the same version (or
+creating two snapshots concurrently racing to assign MAX+1) is prevented by
+three independently-true safeguards. All three must be bypassed for a
+duplicate to exist; any one alone is sufficient.
+
+**Layer (a) — DB `unique_together(meeting, version)` hard constraint.**
+
+```python
+class ApprovedMeetingSnapshot(models.Model):
+    class Meta:
+        unique_together = [("meeting", "version")]
+```
+
+Django migration `meetings.00XX_add_approved_meeting_snapshot` creates this
+constraint at the SQL level. Even a buggy app-level concurrent write is
+caught by the database, which raises `IntegrityError` → transaction aborts.
+
+**Layer (b) — `select_for_update` app-level row lock inside `transaction.atomic` in `create_approved_snapshot`.**
+
+```python
+@transaction.atomic
+def create_approved_snapshot(meeting, by_user, *, trigger="MANUAL"):
+    # Lock the meeting row so concurrent snapshot calls serialise on this
+    # transaction. Any other call trying to create for the same meeting will
+    # block on select_for_update until this txn commits (then sees new MAX).
+    locked = (
+        Meeting.objects
+        .select_for_update()
+        .get(pk=meeting.pk)
+    )
+    current_max = (
+        ApprovedMeetingSnapshot.objects
+        .filter(meeting=locked)
+        .aggregate(m=Max("version"))["m"] or 0
+    )
+    snapshot = ApprovedMeetingSnapshot.objects.create(
+        meeting=locked,
+        version=current_max + 1,
+        ...
+    )
+```
+
+Concurrency proof: with `SERIALIZABLE` or even default `READ COMMITTED`, two
+concurrent `create_approved_snapshot` calls on the same meeting will
+serialise on the `select_for_update(Meeting)` lock. The first commits with
+version=N; the second wakes up, re-reads MAX, and assigns version=N+1. No
+race, no duplicate.
+
+**Layer (c) — `transition_meeting` sets `published_at` only once if null.**
+
+The meeting-level PUBLISH transition (§7 step 7) calls `transition_meeting`
+which internally guards `published_at`:
+
+```python
+if meeting.published_at is None:
+    meeting.published_at = now()
+```
+
+and the very same code path calls `create_approved_snapshot(..., trigger="PUBLISH")`
+inside the same `transaction.atomic` block. Since published_at is set
+idempotently (only when None), clicking "Publish" **twice** in the UI on the
+same meeting will:
+- First click: publish transition runs, `published_at` becomes non-None, snapshot v=1 created.
+- Second click: `transition_meeting` finds no valid edge (meeting is already PUBLISHED),
+  raises `ValidationError("invalid transition")` **before** any snapshot code runs.
+
+The trigger values for `ApprovedMeetingSnapshot.trigger` are:
+
+| Trigger value | Meaning                                                                 |
+|---------------|-------------------------------------------------------------------------|
+| `SUBMIT`      | (Reserved — not used in Phase 6; allocated for future auto-snapshot)    |
+| `APPROVE`     | Snapshot auto-created at meeting APPROVED transition                    |
+| `PUBLISH`     | Snapshot auto-created at meeting PUBLISH transition (primary trigger)   |
+| `MANUAL`      | Admin/Chair clicked "Create snapshot" button on an APPROVED meeting     |
+
+### 14d — Immutability: `ApprovedMeetingSnapshot.clean()` 6-Field Lock
+
+Once a snapshot row is saved (created), 6 of its fields are frozen forever.
+Enforcement lives in `ApprovedMeetingSnapshot.clean()` (called from both
+ModelForm and the service layer on every save):
+
+```python
+def clean(self):
+    if self.pk is not None:  # post-create
+        locked_fields = [
+            "meeting", "version", "payload", "snapshot_time",
+            "created_by", "trigger"
+        ]
+        from_db = ApprovedMeetingSnapshot.objects.get(pk=self.pk)
+        for f in locked_fields:
+            if getattr(self, f) != getattr(from_db, f):
+                raise ValidationError(
+                    {f: f"{f} is immutable after ApprovedMeetingSnapshot creation"}
+                )
+```
+
+The only fields that may be updated post-create are reserved admin-only
+columns (`superseded_by` FK + `admin_notes` text) — these are excluded from
+the clean-lock and are not covered by the snapshot payload hash. Tests
+(`tests/test_meetings_submissions_transitions.py::test_approved_snapshot_locked_fields_post_create`)
+verify each of the 6 fields raises `ValidationError` individually.
+
+---
+
+## §15 — REPORTS & EXPORTS FLOW (Phase 7)
+
+### 15a — Ten Reports Catalog
+
+Phase 7 ships **10 standardized management reports**. Each report is
+identified by a stable slug (used in URLs, the catalog map, audit events,
+and filename prefixes) and is served from `apps/reports/views.py`.
+
+| #  | Slug                           | Report Name                        | Classification¹ | PK Required² |
+|----|--------------------------------|------------------------------------|-----------------|:------------:|
+|  1 | `management-meeting-minutes`   | Management Meeting Minutes         | Minutes         |  Snapshot    |
+|  2 | `action-item-register`         | Action Item Register               | Tabular         |      —       |
+|  3 | `open-action-items`            | Open Action Items                  | Tabular         |      —       |
+|  4 | `overdue-action-items`         | Overdue Action Items               | Tabular         |      —       |
+|  5 | `department-action-items`      | Department Action Items            | Tabular         |      —       |
+|  6 | `meeting-readiness`            | Meeting Readiness                  | Tabular         |   Meeting    |
+|  7 | `sales-performance`            | Sales Performance                  | Tabular         |    Period    |
+|  8 | `weekly-commitments`           | Weekly Commitments                 | Tabular         | Snapshot/Period |
+|  9 | `meeting-history`              | Meeting History                    | Tabular         |      —       |
+| 10 | `authorized-audit-report`      | Authorized Audit Report            | Tabular         |      —       |
+
+¹ **Classification rules** — determine which export formats are supported:
+- **Minutes** reports: all 4 formats (HTML, PDF, Word, Excel).
+- **Tabular** reports: all 4 formats (Excel + Word + PDF + HTML).
+- **Narrative** reports (not present in Phase 7): Word + PDF + HTML only
+  (Excel omitted since narrative text has no tabular structure to export).
+
+² **PK source** — reports that require a context object (snapshot, meeting,
+period) take the PK via URL kwarg or `?pk=` query parameter. The remaining
+"register-style" reports build their data from the full database queryset
+(with optional date-range query params for the audit report).
+
+### 15b — Formats Supported per Report
+
+Per the classification rules above, the format coverage grid for the Phase 7
+catalog is:
+
+| Report Name               | HTML | PDF | Word | Excel |
+|---------------------------|:----:|:---:|:----:|:-----:|
+| Management Meeting Minutes|  ✔   |  ✔  |  ✔   |   ✔   |
+| Action Item Register      |  ✔   |  ✔  |  ✔   |   ✔   |
+| Open Action Items         |  ✔   |  ✔  |  ✔   |   ✔   |
+| Overdue Action Items      |  ✔   |  ✔  |  ✔   |   ✔   |
+| Department Action Items   |  ✔   |  ✔  |  ✔   |   ✔   |
+| Meeting Readiness         |  ✔   |  ✔  |  ✔   |   ✔   |
+| Sales Performance         |  ✔   |  ✔  |  ✔   |   ✔   |
+| Weekly Commitments        |  ✔   |  ✔  |  ✔   |   ✔   |
+| Meeting History           |  ✔   |  ✔  |  ✔   |   ✔   |
+| Authorized Audit Report   |  ✔   |  ✔  |  ✔   |   ✔   |
+
+Format routing is handled by the generic dispatch views at the bottom of
+`apps/reports/views.py`: `PrintableHtmlView`, `ExcelExportView`,
+`WordExportView`, `PdfExportView` — each accepts `report=<slug>` and
+optionally `pk=<uuid>` in its URL pattern, then composes the correct base
+report view class with the appropriate format mixin at dispatch time.
+
+### 15c — Minutes Layout: 23 Components Checklist
+
+The Management Meeting Minutes report (slug `management-meeting-minutes`)
+renders from an immutable `ApprovedMeetingSnapshot.payload`. The layout
+below is produced both by `templates/reports/management_meeting_minutes.html`
+and mirrored in the Word/Excel exporters. The checklist below confirms
+which of the 23 PHASE7-required components are present (✔ / ✘):
+
+| #  | Component                               | Present | Implementation Note                                                    |
+|----|-----------------------------------------|:-------:|------------------------------------------------------------------------|
+|  1 | Company name                            |    ✔    | `.doc-header .company` from base_printable; defaults to "MIMOM".       |
+|  2 | Document title                          |    ✔    | `.doc-header .title`; value = "Management Meeting Minutes".           |
+|  3 | Reference number                        |    ✔    | `.meta Ref:` field; pulled from `meeting.reference` (e.g. `MRG-2026-0003`). |
+|  4 | Meeting date                            |    ✔    | `.meta Meeting:` field; `meeting.start_at` formatted.                 |
+|  5 | Reporting cut-off                       |    ✔    | `.meta Cut-off:` field; populated from snapshot or period context.    |
+|  6 | Status label                            |    ✔    | `.meta Status:`; e.g. "Approved", "Published".                        |
+|  7 | Version number                          |    ✔    | `.meta Version:`; sequential int from snapshot.version (v1, v2…).     |
+|  8 | Attendance summary                      |    ✔    | `.section-attendance .attendee-grid` — 3-column list of names.        |
+|  9 | Agenda sections                         |    ✔    | Per-category agenda breakdown; items with title + owner + status.     |
+| 10 | Discussion summaries                    |    ✔    | Sanitized rich-text per agenda item; rendered under discussion headings. |
+| 11 | Decisions                               |    ✔    | Formal decisions list; per-item decision field + rationale.           |
+| 12 | Action items table                      |    ✔    | Table of action items pulled from `payload.action_items[]`.            |
+| 13 | Action item owners                      |    ✔    | "Owner" column; `owner_name` from the payload or FK.display_name.     |
+| 14 | Action item due dates                   |    ✔    | "Due Date" column; formatted ISO date.                                |
+| 15 | Action item statuses                    |    ✔    | "Status" column + colored status badge (Open/In Progress/Complete…).  |
+| 16 | Action item priorities                  |    ✔    | "Priority" column; High/Medium/Low labels.                            |
+| 17 | Sales performance tables                |    ✔    | Group × Period KPIs pulled from `payload.sales_performance` or linked snapshots. |
+| 18 | Department updates                      |    ✔    | Per-department sections from `payload.departments` (submission content). |
+| 19 | Approval information / signatures       |    ✔    | `.approval-block .sig-col`; chair / secretary / approver sign-off rows. |
+| 20 | Confidentiality notice                  |    ✔    | `.confidential-notice` in the footer; rendered on all minutes pages.  |
+| 21 | Generated timestamp                     |    ✔    | `.meta Generated:` in header + footer `{% now "Y-m-d H:i:s" %}`.      |
+| 22 | Page numbers (N of M)                   |    ✔    | `@bottom-right` CSS margin-box: `Page N of M` via CSS counters.       |
+| 23 | Site / company footer branding          |    ✔    | `.doc-footer` with company name + site name divider.                  |
+
+All 23 components are **implemented and present** in the Phase 7 minutes
+renderer.
+
+### 15d — Ten Export Requirements: Implementation Notes
+
+PHASE7.md lists 10 requirements governing report generation and exports.
+The implementation notes below map each requirement to the code that
+enforces it, so any future refactor can re-check the same locations.
+
+| #  | Requirement                                             | Implementation                                                                                              |
+|----|---------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|
+|  1 | **Generate approved reports from immutable snapshots** | `ManagementMeetingMinutesView` inherits `ApprovedSnapshotRequiredMixin.dispatch()` which raises `403` if `snapshot.approved_at is None`. The view reads from `ApprovedMeetingSnapshot.payload` (JSONField locked post-create by `ApprovedMeetingSnapshot.clean()` 6-field guard) — never from live Meeting/Agendum rows. Snapshot-context reports (weekly commitments, sales) similarly prefer `GroupPerformanceSnapshot` rows, whose `is_snapshot_locked()` returns True when linked to a non-editable meeting. |
+|  2 | **Add print-specific CSS**                              | `templates/reports/base_printable.html` embeds a 180-line `<style>` block prefixed with `@page` directives and `@media print` guards. Reports using the mixin pass `print_css=None` → the full default block renders (see `docs/reports_model.md` §4 for the coverage table of each print-CSS feature). |
+|  3 | **Repeat table headers when supported**                 | Print CSS rule: `thead { display: table-header-group; }` (base_printable.html:64). Paired with `<thead>` / `<tbody>` semantic structure in every report template. Paged media (Chrome print, WeasyPrint, Word import) repeats `<thead>` rows at the top of each page automatically. |
+|  4 | **Avoid splitting short action-item rows across pages** | Print CSS rule: `tbody tr.action-row { page-break-inside: avoid; }` (base_printable.html:80). Action-item list templates add `class="action-row"` to every `<tr>` in the action-items table. Longer rows (multi-line description) may still split (browser best-effort per CSS spec). |
+|  5 | **Right-align financial values**                        | Print CSS rules: `.money, .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }` (base_printable.html:86–90). Excel writer applies `alignment=Alignment(horizontal="right")` to columns in the `money_cols` frozenset passed per sheet. Word writer right-aligns cells in numeric columns by convention. |
+|  6 | **Provide clear negative-value formatting**             | Print CSS: `.negative { color: #9b2c2c; }` (base_printable.html:91) paired with financial template cells that conditionally add class `negative` when value < 0. Excel writer sets `font.color=colors.RED` and `number_format='_([$$-409]* #,##0.00_);_([$$-409]* (#,##0.00);_([$$-409]* "-"??_);_(@_)'` (accounting parens format) for negative money. Report templates render deficit cells with `parens` filter variant when negative. |
+|  7 | **Validate permissions before export**                  | **Three-layer gate.** (a) View mixins: `ExcelExportMixin`, `WordExportMixin`, `PdfExportMixin` each call `can_export_reports(self.request.user)` in `render_to_response()` and raise `PermissionDenied(403)` if False. (b) Report slug view gate: `ReportMixin.dispatch()` runs `can_view_report(request.user, slug)` **before** any format mixin runs, so unpermitted viewers get 403 even for the HTML preview. (c) Form-level / service-layer: Authorized audit report restricts via slug-specific `AUDIT_REPORT_VIEW_ROLES`. See `docs/permissions.md` §6 for the full role matrix. |
+|  8 | **Add export events to the audit log**                  | `_log_export(request, report_slug, target, extra)` helper at `apps/reports/views.py:53`. Called from each format mixin's `render_to_response` (Excel/Word/PDF explicitly; HTML via optional `LOG_HTML_VIEW` setting). Writes `AuditLog.ACTION_EXPORT` with: actor=request.user, ip_address=client IP, new_values={report_slug, format}`, reason="Exported report: {slug}". The call is wrapped in `try/except` so a failed audit write never blocks a user's download (best-effort, never silent-fails to raise if DB is down). |
+|  9 | **Sanitize exported rich-text content**                 | `apps/reports/services.py:sanitize_html(html) → SafeString` (line 98). Applied by `minutes_payload()` to every string leaf in the snapshot payload via `_walk()`, and to every report template that renders user-authored fields. Sanitization is **two-phase**: (phase 1) strip `<script>`, `<iframe>`, `<style>`, `<svg>`, `on*=` handlers, `srcdoc=`, `javascript:` URIs via `_DANGEROUS_PATTERNS`; (phase 2) tokenize the remaining string, allowlisting only `<p/br/strong/em/b/i/ul/ol/li>` tags via `_ALLOWED_TAGS_RE`, escaping everything else. Fallback: `strip_tags + escape` if the allowlist result is empty (defense in depth). See `docs/reports_model.md` §3 for the sanitization rules matrix. |
+| 10 | **Use meaningful filenames**                            | `apps/reports/services.py:meaningful_report_filename(report_slug, suffix, meeting, snapshot, period, user, timestamp) → str` (line 55). Builds filename as `{prefix}_{ref}_v{N}_{period}_{YYYYMMDD-HHMMSS}.{ext}` joined with `_`, replaces invalid chars `\/?*:|"<> ` with `_` via `_FILENAME_BAD_CHARS`. Prefix map: `_REPORT_SLUG_PREFIXES` (e.g., `meeting_minutes → MIMOM_MeetingMinutes`). Timestamp always UTC, zero-padded. Result is deterministic for the same inputs so repeated downloads don't create dupe-names on disk (aside from the timestamp). Three examples are in `docs/reports_model.md` §3. |
+
+Each of the 10 requirements is covered by at least one dedicated unit test in
+`tests/test_reports_generation.py`, `tests/test_reports_permissions.py`, and
+`tests/test_reports_audit.py`.
+
+---
+
+## §17 — UI DESIGN SYSTEM LINK
+
+The Intranet ships a formal, testable UI design system covering design tokens,
+reusable components (cards, badges, progress bars, status mappings, toasts,
+confirmation dialogs, alerts, empty states), responsive layout breakpoints
+with sidebar collapse behaviour and responsive card grids, WCAG 2.1 AA
+accessibility rules (color contrast, keyboard focus rings, ARIA
+labels/roles/live regions, semantic headings, table captions), search +
+filter panel contracts with reset buttons and query-preserving pagination,
+form patterns (sticky submit bar, validation summaries with `role=alert`,
+`.is-invalid` field states, mobile-appropriate input types), and table
+patterns (sticky thead, scrollable wrap with `tabindex`, `@media <768px`
+row-to-card conversion via `data-label`). The full specification lives in
+[`docs/ui_design_system.md`](ui_design_system.md) and is enforced by 11
+UI-component tests in `tests/test_ui_components.py` covering dashboard KPI
+card responsiveness, login toast feedback, sticky submit bars, validation
+alerts, empty states, scrollable table wrappers with captions and sticky
+headers, `data-label` attributes on `td`s, filter-panel reset buttons,
+pagination ARIA labels, sidebar collapse toggles, and the shared
+confirmation-dialog modal.
+

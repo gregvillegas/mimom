@@ -1,0 +1,138 @@
+{% extends 'reports/base_printable.html' %}
+
+{% block page_title %}Department Action Items | {{ company|default:"MIMOM" }}{% endblock %}
+
+{% block report_header %}
+<div class="doc-header">
+    <div class="company">{{ company|default:"MIMOM" }}</div>
+    <div class="title">Department Action Items</div>
+    <div class="meta">
+        <span><strong>Document:</strong> AI-BY-DEPARTMENT</span>
+        {% if reporting_cutoff %}<span><strong>Cut-off:</strong> {{ reporting_cutoff }}</span>{% endif %}
+        <span><strong>Status:</strong> All Statuses Grouped</span>
+        <span><strong>Version:</strong> 1.0</span>
+    </div>
+    <div class="meta">
+        {% if generated_at %}<span><strong>Generated:</strong> {{ generated_at|date:"Y-m-d H:i:s" }}</span>
+        {% else %}<span><strong>Generated:</strong> {% now "Y-m-d H:i:s" %}</span>{% endif %}
+        <span><strong>Departments:</strong> {{ department_groups|length|default:0 }}</span>
+    </div>
+</div>
+{% endblock report_header %}
+
+{% block report_content %}
+
+<h2>Department Summary</h2>
+<table>
+    <thead>
+        <tr>
+            <th style="width: 30%;">Department</th>
+            <th style="width: 12%;" class="num">Total</th>
+            <th style="width: 12%;" class="num">Open</th>
+            <th style="width: 12%;" class="num">In Progress</th>
+            <th style="width: 12%;" class="num">Completed</th>
+            <th style="width: 12%;" class="num">Cancelled</th>
+            <th style="width: 10%;" class="num">Overdue</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for g in department_groups %}
+        {% with items=g.items %}
+        <tr>
+            <td><strong>{{ g.department }}</strong></td>
+            <td class="num">{{ items|length }}</td>
+            <td class="num">
+                {% for i in items %}{% if i.status == 'OPEN' or i.get_status_display == 'Open' %}1{% endif %}{% endfor %}
+            </td>
+            <td class="num">
+                {% for i in items %}{% if i.status == 'IN_PROGRESS' or i.get_status_display == 'In Progress' %}1{% endif %}{% endfor %}
+            </td>
+            <td class="num">
+                {% for i in items %}{% if i.status == 'COMPLETED' or i.get_status_display == 'Completed' %}1{% endif %}{% endfor %}
+            </td>
+            <td class="num">
+                {% for i in items %}{% if i.status == 'CANCELLED' or i.get_status_display == 'Cancelled' %}1{% endif %}{% endfor %}
+            </td>
+            <td class="num">
+                {% for i in items %}{% if i.is_overdue %}1{% endif %}{% endfor %}
+            </td>
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr>
+            <td colspan="7" style="text-align: center; padding: 16pt;">
+                <em>No department groups found.</em>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% for g in department_groups %}
+<h2>Department &mdash; {{ g.department }}</h2>
+<table>
+    <thead>
+        <tr>
+            <th style="width: 5%;">#</th>
+            <th style="width: 14%;">Reference</th>
+            <th style="width: 28%;">Title</th>
+            <th style="width: 14%;">Owner</th>
+            <th style="width: 10%;">Due Date</th>
+            <th style="width: 13%;">Status</th>
+            <th style="width: 8%;">Priority</th>
+            <th style="width: 8%;">Source</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in g.items %}
+        <tr class="action-row{% if item.is_overdue %} danger{% endif %}">
+            <td>{{ forloop.counter }}</td>
+            <td style="font-family: monospace; font-size: 9pt;">{{ item.reference|default:"—" }}</td>
+            <td>
+                <strong>{{ item.title|default:"—" }}</strong>
+                {% if item.description %}
+                <div style="font-size: 8.5pt; color: #555; margin-top: 2pt;">
+                    {{ item.description|truncatewords:20|default:"" }}
+                </div>
+                {% endif %}
+            </td>
+            <td>
+                {% if item.owner %}{{ item.owner.get_display_name|default:item.owner }}{% else %}<em>Unassigned</em>{% endif %}
+            </td>
+            <td>
+                {% if item.is_overdue %}
+                <strong style="color: #9b2c2c;">{{ item.due_date|date:"Y-m-d" }}</strong>
+                {% elif item.due_date %}
+                {{ item.due_date|date:"Y-m-d" }}
+                {% else %}<em>—</em>{% endif %}
+            </td>
+            <td>
+                {% with status=item.get_status_display|default:item.status %}
+                <span class="badge
+                    {% if status == 'COMPLETED' or status == 'Completed' %}badge-success
+                    {% elif status == 'OPEN' or status == 'Open' %}badge-info
+                    {% elif status == 'IN_PROGRESS' or status == 'In Progress' %}badge-warning
+                    {% elif status == 'BLOCKED' or status == 'Blocked' %}badge-danger
+                    {% elif status == 'CANCELLED' or status == 'Cancelled' %}badge-secondary
+                    {% else %}badge-secondary{% endif %}">
+                    {{ status|default:"—" }}
+                </span>
+                {% endwith %}
+            </td>
+            <td>{{ item.get_priority_display|default:item.priority|default:"—" }}</td>
+            <td style="font-size: 8.5pt;">
+                {% if item.source_meeting %}{{ item.source_meeting.reference|default:item.source_meeting|truncatechars:10 }}{% else %}—{% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="8" style="text-align: center; padding: 14pt;">
+                <em>No action items for {{ g.department }}.</em>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endfor %}
+
+{% endblock report_content %}

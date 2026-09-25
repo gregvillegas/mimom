@@ -1,129 +1,162 @@
 {% extends 'base.html' %}
 {% block content %}
+{% load permissions %}
+{% can_manage_departments_tag as can_manage_depts %}
+{% can_manage_positions_tag as can_manage_positions %}
 <div class="row justify-content-center">
     <div class="col-lg-10">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
                 <h2 class="h6 fw-semibold mb-0">
-                    {% if form_mode == 'edit' %}Edit User{% else %}Create New User{% endif %}
+                    {{ page_title }}
                 </h2>
+                {% if 'department' in request.resolver_match.url_name %}
+                <a href="{% url 'accounts:department_list' %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i> Back to Departments
+                </a>
+                {% elif 'position' in request.resolver_match.url_name %}
+                <a href="{% url 'accounts:position_list' %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i> Back to Positions
+                </a>
+                {% else %}
                 <a href="{% url 'accounts:user_list' %}" class="btn btn-sm btn-outline-secondary">
                     <i class="bi bi-arrow-left me-1"></i> Back to Users
                 </a>
+                {% endif %}
             </div>
             <div class="card-body p-4">
-                <form method="post" class="needs-validation" novalidate>
+                <form method="post" class="needs-validation" novalidate id="genericForm" aria-describedby="{% if form.non_field_errors %}validation-summary{% endif %}">
                     {% csrf_token %}
+                    <div class="scrollable-form-wrapper">
+                        <div class="row g-3 form-grid">
+                            <div class="col-12">
+                                {% include 'includes/alerts_container.html' with errors=form.non_field_errors %}
+                            </div>
 
-                    {% if form.non_field_errors %}
-                        <div class="alert alert-danger">
-                            {% for err in form.non_field_errors %}{{ err }}<br>{% endfor %}
-                        </div>
-                    {% endif %}
-
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label for="{{ form.username.id_for_label }}" class="form-label fw-medium small text-body-secondary">Username</label>
-                            {{ form.username }}
-                            {% if form.username.errors %}<div class="text-danger small">{{ form.username.errors }}</div>{% endif %}
-                        </div>
-                        <div class="col-md-6">
-                            <label for="{{ form.email.id_for_label }}" class="form-label fw-medium small text-body-secondary">Email</label>
-                            {{ form.email }}
-                            {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors }}</div>{% endif %}
-                        </div>
-
-                        {% if form_mode == 'create' %}
-                        <div class="col-md-6">
-                            <label for="{{ form.password1.id_for_label }}" class="form-label fw-medium small text-body-secondary">Password</label>
-                            {{ form.password1 }}
-                            {% if form.password1.errors %}<div class="text-danger small">{{ form.password1.errors }}</div>{% endif %}
-                        </div>
-                        <div class="col-md-6">
-                            <label for="{{ form.password2.id_for_label }}" class="form-label fw-medium small text-body-secondary">Confirm Password</label>
-                            {{ form.password2 }}
-                            {% if form.password2.errors %}<div class="text-danger small">{{ form.password2.errors }}</div>{% endif %}
-                        </div>
-                        {% endif %}
-
-                        <div class="col-md-6">
-                            <label for="{{ form.first_name.id_for_label }}" class="form-label fw-medium small text-body-secondary">First Name</label>
-                            {{ form.first_name }}
-                            {% if form.first_name.errors %}<div class="text-danger small">{{ form.first_name.errors }}</div>{% endif %}
-                        </div>
-                        <div class="col-md-6">
-                            <label for="{{ form.last_name.id_for_label }}" class="form-label fw-medium small text-body-secondary">Last Name</label>
-                            {{ form.last_name }}
-                            {% if form.last_name.errors %}<div class="text-danger small">{{ form.last_name.errors }}</div>{% endif %}
-                        </div>
-                        <div class="col-md-6">
-                            <label for="{{ form.display_name.id_for_label }}" class="form-label fw-medium small text-body-secondary">Display Name (optional)</label>
-                            {{ form.display_name }}
-                            <div class="form-text small">If blank, uses first + last name.</div>
-                        </div>
-                        <div class="col-md-3">
-                            <label for="{{ form.initials.id_for_label }}" class="form-label fw-medium small text-body-secondary">Initials</label>
-                            {{ form.initials }}
-                        </div>
-                        <div class="col-md-3">
-                            <label for="{{ form.theme.id_for_label }}" class="form-label fw-medium small text-body-secondary">Theme</label>
-                            {{ form.theme }}
-                        </div>
-
-                        <div class="col-md-6">
-                            <label for="{{ form.phone.id_for_label }}" class="form-label fw-medium small text-body-secondary">Phone</label>
-                            {{ form.phone }}
-                        </div>
-                        <div class="col-md-6">
-                            <label for="{{ form.signature_text.id_for_label }}" class="form-label fw-medium small text-body-secondary">Signature Line</label>
-                            {{ form.signature_text }}
-                        </div>
-
-                        <div class="col-md-12">
-                            <label for="{{ form.bio.id_for_label }}" class="form-label fw-medium small text-body-secondary">Bio</label>
-                            <textarea name="{{ form.bio.html_name }}" id="{{ form.bio.id_for_label }}" rows="3" class="form-control">{{ form.bio.value|default:'' }}</textarea>
-                        </div>
-
-                        {% if form_mode == 'edit' or True %}
-                        <div class="col-12 border-top pt-3 mt-2">
-                            <h3 class="h6 fw-semibold mb-2">Roles &amp; Access</h3>
-                        </div>
-                        <div class="col-md-12">
-                            <div class="row">
-                                <label class="col-sm-2 col-form-label small fw-medium text-body-secondary">Assigned Roles</label>
-                                <div class="col-sm-10">
-                                    {{ form.groups }}
-                                    <div class="form-text small">
-                                        Users can belong to multiple roles. Permissions are union of all granted roles.
-                                    </div>
-                                    {% if form.groups.errors %}<div class="text-danger small">{{ form.groups.errors }}</div>{% endif %}
+                            {% if form.username %}
+                                <div class="col-md-6">
+                                    <label for="{{ form.username.id_for_label }}" class="form-label fw-medium small text-body-secondary">Username</label>
+                                    {{ form.username }}{% if form.username.errors %}<div class="invalid-feedback">{% for err in form.username.errors %}{{ err }}{% endfor %}</div>{% endif %}
                                 </div>
-                            </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.email.id_for_label }}" class="form-label fw-medium small text-body-secondary">Email</label>
+                                    {{ form.email }}{% if form.email.errors %}<div class="invalid-feedback">{% for err in form.email.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                                </div>
+
+                                {% if form_mode == 'create' %}
+                                <div class="col-md-6">
+                                    <label for="{{ form.password1.id_for_label }}" class="form-label fw-medium small text-body-secondary">Password</label>
+                                    {{ form.password1 }}{% if form.password1.errors %}<div class="invalid-feedback">{% for err in form.password1.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.password2.id_for_label }}" class="form-label fw-medium small text-body-secondary">Confirm Password</label>
+                                    {{ form.password2 }}{% if form.password2.errors %}<div class="invalid-feedback">{% for err in form.password2.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                                </div>
+                                {% endif %}
+
+                                <div class="col-md-6">
+                                    <label for="{{ form.first_name.id_for_label }}" class="form-label fw-medium small text-body-secondary">First Name</label>
+                                    {{ form.first_name }}{% if form.first_name.errors %}<div class="invalid-feedback">{% for err in form.first_name.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.last_name.id_for_label }}" class="form-label fw-medium small text-body-secondary">Last Name</label>
+                                    {{ form.last_name }}{% if form.last_name.errors %}<div class="invalid-feedback">{% for err in form.last_name.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.display_name.id_for_label }}" class="form-label fw-medium small text-body-secondary">Display Name (optional)</label>
+                                    {{ form.display_name }}
+                                    <div class="form-text small">If blank, uses first + last name.</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="{{ form.initials.id_for_label }}" class="form-label fw-medium small text-body-secondary">Initials</label>
+                                    {{ form.initials }}{% if form.initials.errors %}<div class="invalid-feedback">{% for err in form.initials.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="{{ form.theme.id_for_label }}" class="form-label fw-medium small text-body-secondary">Theme</label>
+                                    {{ form.theme }}{% if form.theme.errors %}<div class="invalid-feedback">{% for err in form.theme.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="{{ form.phone.id_for_label }}" class="form-label fw-medium small text-body-secondary">Phone</label>
+                                    {{ form.phone }}{% if form.phone.errors %}<div class="invalid-feedback">{% for err in form.phone.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="{{ form.signature_text.id_for_label }}" class="form-label fw-medium small text-body-secondary">Signature Line</label>
+                                    {{ form.signature_text }}{% if form.signature_text.errors %}<div class="invalid-feedback">{% for err in form.signature_text.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-12">
+                                    <label for="{{ form.bio.id_for_label }}" class="form-label fw-medium small text-body-secondary">Bio</label>
+                                    <textarea name="{{ form.bio.html_name }}" id="{{ form.bio.id_for_label }}" rows="3" class="form-control{% if form.bio.errors %} is-invalid{% endif %}">{{ form.bio.value|default:'' }}</textarea>
+                                    {% if form.bio.errors %}<div class="invalid-feedback">{% for err in form.bio.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                                </div>
+
+                                {% if form_mode == 'edit' or True %}
+                                <div class="col-12 border-top pt-3 mt-2">
+                                    <h3 class="h6 fw-semibold mb-2">Roles &amp; Access</h3>
+                                </div>
+                                <div class="col-md-12">
+                                    <div class="row">
+                                        <label class="col-sm-2 col-form-label small fw-medium text-body-secondary">Assigned Roles</label>
+                                        <div class="col-sm-10">
+                                            {{ form.groups }}
+                                            <div class="form-text small">
+                                                Users can belong to multiple roles. Permissions are union of all granted roles.
+                                            </div>
+                                            {% if form.groups.errors %}<div class="invalid-feedback d-block">{% for err in form.groups.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mt-4">
+                                        <input type="checkbox" name="{{ form.is_active.html_name }}" id="{{ form.is_active.id_for_label }}" class="form-check-input" {% if form.is_active.value %}checked{% endif %}>
+                                        <label for="{{ form.is_active.id_for_label }}" class="form-check-label small fw-medium">Account is Active</label>
+                                        <div class="form-text small">Inactive users cannot log in or receive new department assignments.</div>
+                                    </div>
+                                </div>
+                                {% if form_mode == 'edit' %}
+                                <div class="col-md-6">
+                                    <div class="form-check mt-4">
+                                        <input type="checkbox" name="{{ form.is_staff.html_name }}" id="{{ form.is_staff.id_for_label }}" class="form-check-input" {% if form.is_staff.value %}checked{% endif %}>
+                                        <label for="{{ form.is_staff.id_for_label }}" class="form-check-label small fw-medium">Staff (Django Admin)</label>
+                                        <div class="form-text small">Grants access to Django admin backend.</div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                {% endif %}
+                            {% else %}
+                                {% for field in form.visible_fields %}
+                                <div class="{% if field.name == 'description' %}col-md-12{% else %}col-md-6{% endif %}">
+                                    {% if field.field.widget.input_type == 'checkbox' %}
+                                    <div class="form-check mt-4">
+                                        <input type="checkbox" name="{{ field.html_name }}" id="{{ field.id_for_label }}" class="form-check-input{% if field.errors %} is-invalid{% endif %}" {% if field.value %}checked{% endif %}>
+                                        <label for="{{ field.id_for_label }}" class="form-check-label small fw-medium">{{ field.label }}</label>
+                                        {% if field.help_text %}<div class="form-text small">{{ field.help_text }}</div>{% endif %}
+                                        {% if field.errors %}<div class="invalid-feedback">{% for err in field.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                                    </div>
+                                    {% else %}
+                                    <label for="{{ field.id_for_label }}" class="form-label fw-medium small text-body-secondary">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% if field.help_text %}<div class="form-text small">{{ field.help_text }}</div>{% endif %}
+                                    {% if field.errors %}<div class="invalid-feedback">{% for err in field.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            {% endif %}
                         </div>
-                        <div class="col-md-6">
-                            <div class="form-check mt-4">
-                                <input type="checkbox" name="{{ form.is_active.html_name }}" id="{{ form.is_active.id_for_label }}" class="form-check-input" {% if form.is_active.value %}checked{% endif %}>
-                                <label for="{{ form.is_active.id_for_label }}" class="form-check-label small fw-medium">Account is Active</label>
-                                <div class="form-text small">Inactive users cannot log in or receive new department assignments.</div>
-                            </div>
-                        </div>
-                        {% if form_mode == 'edit' %}
-                        <div class="col-md-6">
-                            <div class="form-check mt-4">
-                                <input type="checkbox" name="{{ form.is_staff.html_name }}" id="{{ form.is_staff.id_for_label }}" class="form-check-input" {% if form.is_staff.value %}checked{% endif %}>
-                                <label for="{{ form.is_staff.id_for_label }}" class="form-check-label small fw-medium">Staff (Django Admin)</label>
-                                <div class="form-text small">Grants access to Django admin backend.</div>
-                            </div>
-                        </div>
-                        {% endif %}
-                        {% endif %}
                     </div>
 
-                    <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                    <div class="sticky-submit-bar btn-primary-submit mt-3">
+                        {% if 'department' in request.resolver_match.url_name %}
+                        <a href="{% url 'accounts:department_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                        {% elif 'position' in request.resolver_match.url_name %}
+                        <a href="{% url 'accounts:position_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                        {% else %}
                         <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                        {% endif %}
                         <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2">
                             <i class="bi bi-check2-square"></i>
-                            {% if form_mode == 'edit' %}Save Changes{% else %}Create User{% endif %}
+                            {% if form_mode == 'edit' %}Save Changes{% else %}Create{% endif %}
                         </button>
                     </div>
                 </form>

@@ -1,0 +1,384 @@
+{% load sales_formatting %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>
+    {% if snapshot.payload.metadata %}
+      {{ snapshot.payload.metadata.reference|default:"SNAPSHOT" }} · v{{ snapshot.version }} · Minutes
+    {% else %}
+      Snapshot v{{ snapshot.version }}
+    {% endif %}
+  </title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" crossorigin="anonymous">
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 1.25cm;
+    }
+    @media print {
+      .sidebar, .navbar, .offcanvas, .toast-container, footer,
+      .no-print, .btn, .card-header .btn, nav {
+        display: none !important;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      .content-wrapper {
+        margin-left: 0 !important;
+      }
+      .card {
+        border: 1px solid #dee2e6 !important;
+        box-shadow: none !important;
+        break-inside: avoid;
+      }
+      .page-break {
+        page-break-before: always;
+      }
+    }
+    body {
+      font-size: 0.9rem;
+      color: #212529;
+      background: #ffffff;
+    }
+    .muted { color: #6c757d; }
+    .tbl { width: 100%; border-collapse: collapse; }
+    .tbl th, .tbl td { border: 1px solid #dee2e6; padding: 0.4rem 0.6rem; vertical-align: top; }
+    .tbl thead th { background-color: #f8f9fa; font-weight: 600; text-align: left; }
+    .tbl tfoot td { background-color: #f1f5f9; font-weight: 600; }
+    .label { color: #6c757d; font-size: 0.8rem; }
+    .whitespace-pre-wrap { white-space: pre-wrap; word-wrap: break-word; }
+    .section-badge {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.375rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    .bg-info-soft { background-color: #cff4fc; color: #055160; }
+    .bg-success-soft { background-color: #d1e7dd; color: #0f5132; }
+    .bg-warning-soft { background-color: #fff3cd; color: #664d03; }
+    .bg-primary-soft { background-color: #cfe2ff; color: #084298; }
+    .header-row {
+      border-bottom: 2px solid #0d6efd;
+      padding-bottom: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .snapshot-tag {
+      display: inline-block;
+      background-color: #198754;
+      color: #ffffff;
+      padding: 0.25rem 0.6rem;
+      border-radius: 0.375rem;
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+    .agenda-item {
+      border: 1px solid #dee2e6;
+      border-radius: 0.5rem;
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .no-print-section {
+      padding: 0.75rem;
+      background-color: #f8f9fa;
+      border-radius: 0.5rem;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body class="printable-wrapper">
+  <div class="container-fluid">
+    <div class="no-print-section no-print">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <span class="snapshot-tag">
+            <i class="bi bi-shield-lock"></i> SNAPSHOT v{{ snapshot.version }} · {{ snapshot.get_trigger_display }}
+          </span>
+          <small class="ms-2 muted">Immutable · rendered from payload only</small>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="button" onclick="window.print()" class="btn btn-sm btn-primary">
+            <i class="bi bi-printer"></i> Print / Save PDF
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-row">
+      <h2 class="mb-1">
+        {% if snapshot.payload.metadata %}
+          {{ snapshot.payload.metadata.title|default:"Meeting Minutes" }}
+        {% else %}
+          Approved Meeting Snapshot
+        {% endif %}
+        <small class="muted">
+          {% if snapshot.payload.metadata %}
+            · {{ snapshot.payload.metadata.type_name|default:"" }}
+          {% endif %}
+        </small>
+      </h2>
+      <div class="muted small">
+        {% if snapshot.payload.metadata %}
+          <strong class="font-monospace">{{ snapshot.payload.metadata.reference|default:"—" }}</strong>
+          &nbsp;·&nbsp;
+          {{ snapshot.payload.metadata.start_at|default:"" }}
+          {% if snapshot.payload.metadata.end_at %} – {{ snapshot.payload.metadata.end_at }}{% endif %}
+          {% if snapshot.payload.metadata.location %} · {{ snapshot.payload.metadata.location }}{% endif %}
+          {% if snapshot.payload.metadata.chair_name %} · Chair: {{ snapshot.payload.metadata.chair_name }}{% endif %}
+        {% endif %}
+        &nbsp;·&nbsp;
+        Snapshot created: {{ snapshot.created_at|date:"SHORT_DATE_FORMAT" }} {{ snapshot.created_at|date:"H:i" }}
+      </div>
+    </div>
+
+    <h5>1. Meeting Metadata</h5>
+    <table class="tbl mb-4">
+      <tbody>
+        <tr>
+          <th style="width: 20%;">Reference</th>
+          <td style="width: 30%;">
+            {% if snapshot.payload.metadata %}{{ snapshot.payload.metadata.reference|default:"—" }}{% else %}—{% endif %}
+          </td>
+          <th style="width: 20%;">Type</th>
+          <td style="width: 30%;">
+            {% if snapshot.payload.metadata %}{{ snapshot.payload.metadata.type_name|default:"—" }}{% else %}—{% endif %}
+          </td>
+        </tr>
+        <tr>
+          <th>Title</th>
+          <td>{% if snapshot.payload.metadata %}{{ snapshot.payload.metadata.title|default:"—" }}{% else %}—{% endif %}</td>
+          <th>Status at Snapshot</th>
+          <td>{% if snapshot.payload.metadata %}{{ snapshot.payload.metadata.status|default:"—" }}{% else %}—{% endif %}</td>
+        </tr>
+        <tr>
+          <th>Start</th>
+          <td>{% if snapshot.payload.metadata %}{{ snapshot.payload.metadata.start_at|default:"—" }}{% else %}—{% endif %}</td>
+          <th>End</th>
+          <td>{% if snapshot.payload.metadata %}{{ snapshot.payload.metadata.end_at|default:"—" }}{% else %}—{% endif %}</td>
+        </tr>
+        <tr>
+          <th>Location</th>
+          <td>{% if snapshot.payload.metadata.location %}{{ snapshot.payload.metadata.location }}{% else %}—{% endif %}</td>
+          <th>Chair</th>
+          <td>{% if snapshot.payload.metadata.chair_name %}{{ snapshot.payload.metadata.chair_name }}{% else %}—{% endif %}</td>
+        </tr>
+        {% if snapshot.payload.metadata.department_name %}
+        <tr>
+          <th>Department</th>
+          <td>{{ snapshot.payload.metadata.department_name }}</td>
+          <th>Version</th>
+          <td>v{{ snapshot.payload.version|default:snapshot.version }}</td>
+        </tr>
+        {% endif %}
+        {% if snapshot.payload.metadata.description %}
+        <tr>
+          <th>Description</th>
+          <td colspan="3" class="whitespace-pre-wrap">{{ snapshot.payload.metadata.description }}</td>
+        </tr>
+        {% endif %}
+        {% if snapshot.payload.metadata.notes %}
+        <tr>
+          <th>Meeting Notes</th>
+          <td colspan="3" class="whitespace-pre-wrap">{{ snapshot.payload.metadata.notes }}</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+
+    <h5>2. Attendance</h5>
+    <table class="tbl mb-4">
+      <thead>
+        <tr>
+          <th style="width: 35%;">Person</th>
+          <th style="width: 25%;">Role</th>
+          <th style="width: 12%;" class="text-center">Invited</th>
+          <th style="width: 13%;" class="text-center">Attended</th>
+          <th style="width: 15%;">RSVP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in snapshot.payload.attendance %}
+        <tr>
+          <td><strong>{{ a.user_name|default:"—" }}</strong></td>
+          <td class="muted">{% if a.role_at_meeting %}{{ a.role_at_meeting }}{% else %}—{% endif %}</td>
+          <td class="text-center">{% if a.is_invited %}✓{% else %}—{% endif %}</td>
+          <td class="text-center">{% if a.is_attended %}✓{% else %}—{% endif %}</td>
+          <td>{{ a.rsvp_status_label|default:a.rsvp_status|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center muted py-3">No attendance records.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="page-break"></div>
+    <h5>3. Agenda Sections with Discussion &amp; Decisions</h5>
+    {% for item in snapshot.payload.agenda_sections %}
+    <div class="agenda-item">
+      <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+        <span class="fw-bold text-primary">#{{ item.order|default:forloop.counter }}</span>
+        {% if item.category_name %}<span class="section-badge bg-light border">{{ item.category_name }}</span>{% endif %}
+        <span class="section-badge bg-secondary-subtle">{{ item.item_status_label|default:item.item_status|default:"—" }}</span>
+        {% if item.department_name %}<span class="muted small">{{ item.department_name }}</span>{% endif %}
+        {% if item.is_confidential %}<span class="section-badge bg-warning-soft"><i class="bi bi-shield-lock-fill"></i> Confidential</span>{% endif %}
+        <strong class="ms-1">{{ item.title|default:"Untitled" }}</strong>
+        {% if item.owner_name %}<span class="muted small ms-auto">Owner: {{ item.owner_name }}</span>{% endif %}
+      </div>
+      {% if item.discussion %}
+      <div class="mb-2">
+        <div class="small fw-semibold text-info mb-1">4. Discussion</div>
+        <div class="p-2 bg-info-soft rounded small whitespace-pre-wrap">{{ item.discussion }}</div>
+      </div>
+      {% endif %}
+      {% if item.decision %}
+      <div>
+        <div class="small fw-semibold text-success mb-1">5. Decision</div>
+        <div class="p-2 bg-success-soft rounded small whitespace-pre-wrap">{{ item.decision }}</div>
+      </div>
+      {% endif %}
+    </div>
+    {% empty %}
+    <div class="text-center muted py-3 border rounded">No agenda sections.</div>
+    {% endfor %}
+
+    <div class="page-break"></div>
+    <h5>6. Action Items</h5>
+    <table class="tbl mb-4">
+      <thead>
+        <tr>
+          <th style="width: 15%;">Ref</th>
+          <th style="width: 35%;">Title</th>
+          <th style="width: 20%;">Owner</th>
+          <th style="width: 15%;">Due Date</th>
+          <th style="width: 15%;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ai in snapshot.payload.action_items %}
+        <tr>
+          <td class="font-monospace small">{{ ai.reference|default:"—" }}</td>
+          <td>{{ ai.title|default:"—" }}</td>
+          <td>{% if ai.owner_name %}{{ ai.owner_name }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{% if ai.due_date %}{{ ai.due_date }}{% else %}<span class="muted">—</span>{% endif %}</td>
+          <td>{{ ai.status_label|default:ai.status|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center muted py-3">No action items linked.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h5>7. Sales-Performance Data</h5>
+    {% with sales=snapshot.payload.sales_performance %}
+    {% if sales %}
+    <table class="tbl mb-4">
+      <tbody>
+        <tr>
+          <th style="width: 20%;">Period</th>
+          <td style="width: 30%;">{{ sales.period_name|default:"—" }}</td>
+          <th style="width: 20%;">Currency</th>
+          <td style="width: 30%;">{{ sales.currency|default:"PHP" }}</td>
+        </tr>
+        <tr>
+          <th>Revenue Target</th>
+          <td>{% if sales.revenue_target %}{% currency_cell sales.revenue_target sales.currency %}{% else %}—{% endif %}</td>
+          <th>Revenue Actual</th>
+          <td>{% if sales.revenue_actual %}{% currency_cell sales.revenue_actual sales.currency %}{% else %}—{% endif %}</td>
+        </tr>
+        <tr>
+          <th>% Achieved</th>
+          <td>{% if sales.revenue_pct %}{{ sales.revenue_pct|percentage }}{% else %}—{% endif %}</td>
+          <th>Revenue Deficit</th>
+          <td>{% if sales.revenue_deficit is not None %}{% currency_cell sales.revenue_deficit sales.currency signed=True %}{% else %}—{% endif %}</td>
+        </tr>
+        <tr>
+          <th>Profit Actual</th>
+          <td>{% if sales.profit_actual is not None %}{% currency_cell sales.profit_actual sales.currency %}{% else %}—{% endif %}</td>
+          <th>Margin</th>
+          <td>{% if sales.margin_pct %}{{ sales.margin_pct|percentage }}{% else %}—{% endif %}</td>
+        </tr>
+      </tbody>
+    </table>
+    {% else %}
+    <div class="text-center muted py-3 border rounded mb-4">No sales performance data attached.</div>
+    {% endif %}
+    {% endwith %}
+
+    <h5>8. Approval Metadata &amp; Version</h5>
+    {% with approval=snapshot.payload.approval_metadata %}
+    <table class="tbl mb-4">
+      <tbody>
+        <tr>
+          <th style="width: 20%;">Snapshot Version</th>
+          <td style="width: 30%;">v{{ snapshot.payload.version|default:snapshot.version }}</td>
+          <th style="width: 20%;">Trigger</th>
+          <td style="width: 30%;">{{ snapshot.get_trigger_display }}</td>
+        </tr>
+        <tr>
+          <th>Snapshot Created</th>
+          <td>{{ snapshot.created_at|date:"SHORT_DATE_FORMAT" }} {{ snapshot.created_at|date:"H:i" }}</td>
+          <th>Snapshot Payload</th>
+          <td><span class="section-badge bg-success-soft">Immutable · JSON</span></td>
+        </tr>
+        <tr>
+          <th>Approved At</th>
+          <td>
+            {% if snapshot.approved_at %}
+              {{ snapshot.approved_at|date:"SHORT_DATE_FORMAT" }} {{ snapshot.approved_at|date:"H:i" }}
+            {% elif approval.approved_at %}
+              {{ approval.approved_at }}
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
+          <th>Approved By</th>
+          <td>
+            {% if snapshot.approved_by %}
+              {{ snapshot.approved_by.get_display_name }}
+            {% elif approval.approved_by_name %}
+              {{ approval.approved_by_name }}
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <th>Published At</th>
+          <td>
+            {% if snapshot.published_at %}
+              {{ snapshot.published_at|date:"SHORT_DATE_FORMAT" }} {{ snapshot.published_at|date:"H:i" }}
+            {% elif approval.published_at %}
+              {{ approval.published_at }}
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
+          <th>Published By</th>
+          <td>
+            {% if snapshot.published_by %}
+              {{ snapshot.published_by.get_display_name }}
+            {% elif approval.published_by_name %}
+              {{ approval.published_by_name }}
+            {% else %}
+              <span class="muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    {% endwith %}
+
+    <div class="mt-5 pt-3 border-top muted small d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <span>
+        <i class="bi bi-shield-lock"></i>
+        Document printed from approved snapshot v{{ snapshot.version }} · Payload-based (immutable)
+      </span>
+      <span>
+        Generated: {% now "SHORT_DATE_FORMAT" %} {% now "H:i" %}
+      </span>
+    </div>
+  </div>
+</body>
+</html>

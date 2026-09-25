@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% load permissions %}
+{% can_manage_positions_tag as can_manage_positions %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+    <div>
+        <h1 class="h3 fw-bold mb-1">Positions</h1>
+        <p class="text-muted small mb-0">Job titles and levels across the organization.</p>
+    </div>
+    {% if can_manage_positions %}
+    <a href="{% url 'accounts:position_create' %}" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-2">
+        <i class="bi bi-plus-circle-fill"></i> Add Position
+    </a>
+    {% endif %}
+</div>
+
+<div class="card border-0 shadow-sm mb-4 filter-form-card" aria-label="Filter Results">
+    <div class="card-body d-flex flex-wrap gap-2 align-items-end">
+        <form method="get" class="d-flex flex-wrap gap-2 align-items-end w-100">
+            <div class="input-group input-group-lg flex-grow-1" style="min-width: 240px;">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <label class="visually-hidden" for="id_q">Search</label>
+                <input type="text" name="q" id="id_q" class="form-control" placeholder="Search by name or code…" value="{{ query }}">
+            </div>
+            <div class="d-flex gap-2 ms-auto">
+                <button type="submit" class="btn btn-lg btn-outline-primary d-inline-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-funnel"></i> Filter
+                </button>
+                <a href="{% url 'accounts:position_list' %}" class="btn btn-lg btn-outline-secondary d-inline-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-x-lg"></i> Reset
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="scrollable-table-wrap" tabindex="0">
+        <table class="table align-middle mb-0 table-hover" data-table-hover>
+            <caption class="visually-hidden">Table: {{ page_title|default:"Positions" }}</caption>
+            <thead class="sticky-thead bg-white border-bottom">
+                <tr>
+                    <th scope="col" class="small text-uppercase fw-semibold text-body-secondary ps-3">Name</th>
+                    <th scope="col" class="small text-uppercase fw-semibold text-body-secondary">Code</th>
+                    <th scope="col" class="small text-uppercase fw-semibold text-body-secondary">Level</th>
+                    <th scope="col" class="small text-uppercase fw-semibold text-body-secondary">Description</th>
+                    <th scope="col" class="small text-uppercase fw-semibold text-body-secondary">Incumbents</th>
+                    <th scope="col" class="small text-uppercase fw-semibold text-body-secondary">Status</th>
+                    <th scope="col" class="small text-uppercase fw-semibold text-body-secondary pe-3 text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white">
+                {% for pos in positions %}
+                <tr class="border-bottom">
+                    <td data-label="Name" class="ps-3 py-3">
+                        <a href="{% url 'accounts:position_detail' pos.pk %}" class="fw-semibold text-decoration-none">{{ pos.name }}</a>
+                    </td>
+                    <td data-label="Code" class="py-3">
+                        {% if pos.code %}
+                            <span class="font-monospace small text-body-secondary">{{ pos.code }}</span>
+                        {% else %}
+                            <span class="text-muted small">—</span>
+                        {% endif %}
+                    </td>
+                    <td data-label="Level" class="py-3">
+                        <span class="badge rounded-pill bg-primary-subtle text-primary small">L{{ pos.level }}</span>
+                    </td>
+                    <td data-label="Description" class="py-3">
+                        {% if pos.description %}
+                            <span class="text-muted small">{{ pos.description|truncatewords:10 }}</span>
+                        {% else %}
+                            <span class="text-muted small">—</span>
+                        {% endif %}
+                    </td>
+                    <td data-label="Incumbents" class="py-3">
+                        <span class="badge rounded-pill bg-info-subtle text-info small">{{ pos.department_memberships.count }}</span>
+                    </td>
+                    <td data-label="Status" class="py-3">
+                        {% if pos.is_active %}
+                            <span class="badge rounded-pill bg-success-subtle text-success small">Active</span>
+                        {% else %}
+                            <span class="badge rounded-pill bg-secondary-subtle text-secondary small">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td data-label="Actions" class="py-3 pe-3 text-end">
+                        <div class="d-inline-flex gap-1 justify-content-end">
+                            <a href="{% url 'accounts:position_detail' pos.pk %}" class="btn btn-sm btn-outline-secondary" title="View position">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            {% if can_manage_positions %}
+                            <a href="{% url 'accounts:position_edit' pos.pk %}" class="btn btn-sm btn-outline-primary" title="Edit position">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7">
+                        {% include 'components/empty_state.html' with icon='briefcase' title='No positions match your filters' message='Try adjusting the search terms.' %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if is_paginated %}
+    <div class="card-body border-top py-3">
+        <nav aria-label="Positions pagination" class="d-flex justify-content-center mt-4 mb-4 pagination-lg">
+            <ul class="pagination pagination-lg mb-0 justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if query %}&amp;q={{ query }}{% endif %}">Previous</a></li>
+                {% endif %}
+                <li class="page-item active" aria-current="page">
+                    <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                </li>
+                {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if query %}&amp;q={{ query }}{% endif %}">Next</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from calendar import month_name
-from datetime import date
+from datetime import date, timedelta
 from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
@@ -16,47 +16,81 @@ from django.views.generic import (
     CreateView,
     DeleteView,
     DetailView,
+    FormView,
     ListView,
     UpdateView,
     View,
 )
 
 from apps.accounts.models import Department
+from apps.action_items.models import ActionItem
 from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event
 from apps.core.permissions import (
     ArchiveAuthorizedMixin,
     MeetingAuthorRequiredMixin,
+    MinutesApproverRequiredMixin,
+    MinutesEditRequiredMixin,
+    MinutesReviewRequiredMixin,
+    ReopenAuthorizedMixin,
+    can_approve_meeting,
     can_archive_meeting,
+    can_close_meeting,
     can_create_meeting,
     can_edit_meeting,
+    can_publish_meeting,
+    can_reopen_meeting,
+    can_resubmit_minutes,
+    can_return_minutes,
+    can_submit_minutes,
     can_transition_meeting,
     can_view_confidential_items,
 )
 from apps.meetings.forms import (
+    ActionItemCreateFromMinutesForm,
     AgendaCategoryForm,
     AgendaItemAttachmentForm,
     AgendaItemForm,
     AgendaOrderForm,
     MeetingAttachmentForm,
     MeetingForm,
+    MinutesEditorForm,
+    ReturnForCorrectionForm,
     TransitionForm,
     build_attendance_formset,
 )
 from apps.meetings.models import (
+    STATUS_APPROVED,
     STATUS_ARCHIVED,
     STATUS_CHOICES,
+    STATUS_CLOSED,
     STATUS_DRAFT,
+    STATUS_PUBLISHED,
+    STATUS_RETURNED_FOR_CORRECTION,
+    ActionItemLink,
     AgendaCategory,
     AgendaItem,
     AgendaItemAttachment,
+    ApprovedMeetingSnapshot,
+    DepartmentSubmission,
     Meeting,
     MeetingAttachment,
+    MinutesSectionSpec,
 )
 from apps.meetings.services import (
     VALID_TRANSITIONS,
+    agenda_completeness,
+    approve_meeting,
     build_calendar,
     carry_forward_agenda_items,
+    close_meeting,
+    dept_submission_upsert,
+    meetings_prep_dashboard_data,
+    publish_meeting,
+    reopen_meeting,
+    resubmit_for_review,
+    return_for_correction,
+    submit_for_review,
     transition_meeting,
 )
 
@@ -783,3 +817,690 @@ class MeetingCarryForwardView(LoginRequiredMixin, MeetingAuthorRequiredMixin, Vi
         copied = carry_forward_agenda_items(source, target, item_ids, by_user=request.user)
         messages.success(request, f"Carried forward {len(copied)} agenda item(s).")
         return redirect(reverse("meetings:meeting_detail", args=[target.pk]) + "#agenda")
+
+
+class PrepDashboard(LoginRequiredMixin, ListView):
+    model = Meeting
+    context_object_name = "meetings"
+    template_name = "meetings/prep_dashboard.html"
+    paginate_by = 30
+
+    def get_queryset(self):
+        now = timezone.now()
+        window_start = now.date()
+        window_end = window_start + timedelta(days=60)
+        qs = (
+            Meeting.objects.filter(
+                start_at__date__gte=window_start,
+                start_at__date__lte=window_end,
+            )
+            .select_related("type", "chair", "department", "created_by")
+            .prefetch_related(
+                "department_submissions__department",
+                "department_submissions__contributor",
+                "agenda_items",
+            )
+            .order_by("start_at")
+        )
+        user = self.request.user
+        if not (
+            getattr(user, "is_superuser", False)
+            or user.has_role(
+                "System Administrator",
+                "Management Administrator",
+                "Meeting Chairperson",
+                "Minutes Secretary",
+            )
+        ):
+            visible_depts = (
+                set(user.get_assigned_departments().values_list("pk", flat=True))
+                if getattr(user, "is_authenticated", False)
+                else set()
+            )
+            qs = qs.filter(
+                models.Q(department_id__in=visible_depts) | models.Q(department__isnull=True)
+            )
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        counts, _ = meetings_prep_dashboard_data(self.request.user)
+        ctx["dashboard_counts"] = counts
+        ctx["status_choices"] = STATUS_CHOICES
+        return ctx
+
+
+class DeptSubmissionStatusDetail(LoginRequiredMixin, DetailView):
+    model = Meeting
+    context_object_name = "meeting"
+    template_name = "meetings/dept_submission_status.html"
+
+    def get_queryset(self):
+        return (
+            Meeting.objects.all()
+            .select_related("type", "chair", "department")
+            .prefetch_related(
+                "department_submissions__department",
+                "department_submissions__contributor",
+                "department_submissions__submitted_by",
+                "type__section_specs",
+            )
+        )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        meeting = self.object
+        ctx["submissions"] = list(meeting.department_submissions.all())
+        ctx["section_specs"] = list(
+            MinutesSectionSpec.objects.filter(meeting_type=meeting.type_id).order_by("order")
+        )
+        ctx["can_edit"] = can_submit_minutes(self.request.user, meeting)
+        return ctx
+
+
+class DeptSubmissionUpsert(LoginRequiredMixin, MinutesEditRequiredMixin, FormView):
+    template_name = "meetings/dept_submission_form.html"
+    fields = [
+        "department",
+        "contributor",
+        "submission_state",
+        "missing_info",
+        "management_remarks",
+        "notes",
+    ]
+
+    def get_meeting(self):
+        return get_object_or_404(Meeting, pk=self.kwargs["pk"])
+
+    def dispatch(self, request, *args, **kwargs):
+        self.meeting = self.get_meeting()
+        if not can_submit_minutes(request.user, self.meeting):
+            from django.core.exceptions import PermissionDenied
+
+            raise PermissionDenied()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_class(self):
+        from django import forms as dj_forms
+
+        from apps.meetings.models import SUBMISSION_STATUS_CHOICES
+
+        class _DeptSubmissionForm(dj_forms.ModelForm):
+            class Meta:
+                model = DepartmentSubmission
+                fields = [
+                    "department",
+                    "contributor",
+                    "submission_state",
+                    "missing_info",
+                    "management_remarks",
+                    "notes",
+                ]
+                widgets = {
+                    "submission_state": dj_forms.Select(attrs={"class": "form-select"}),
+                    "department": dj_forms.Select(attrs={"class": "form-select"}),
+                    "contributor": dj_forms.Select(attrs={"class": "form-select"}),
+                    "missing_info": dj_forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+                    "management_remarks": dj_forms.Textarea(
+                        attrs={"class": "form-control", "rows": 2}
+                    ),
+                    "notes": dj_forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+                }
+
+            def __init__(self_inner, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                from django.contrib.auth import get_user_model
+
+                User = get_user_model()
+                self_inner.fields["department"].queryset = Department.objects.filter(
+                    is_active=True
+                ).order_by("name")
+                self_inner.fields["contributor"].queryset = User.objects.filter(
+                    is_active=True
+                ).order_by("username")
+                self_inner.fields["submission_state"].choices = SUBMISSION_STATUS_CHOICES
+
+        return _DeptSubmissionForm
+
+    def get_initial(self):
+        initial = super().get_initial()
+        dept_pk = self.request.GET.get("department") or self.request.POST.get("department")
+        if dept_pk:
+            try:
+                existing = DepartmentSubmission.objects.get(
+                    meeting=self.meeting, department_id=dept_pk
+                )
+                for f in self.fields:
+                    if hasattr(existing, f):
+                        val = getattr(existing, f)
+                        if hasattr(val, "pk"):
+                            initial[f] = val.pk
+                        else:
+                            initial[f] = val
+            except DepartmentSubmission.DoesNotExist:
+                pass
+        return initial
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["meeting"] = self.meeting
+        return ctx
+
+    def form_valid(self, form):
+        data = form.cleaned_data
+        try:
+            dept_submission_upsert(
+                self.meeting,
+                data["department"],
+                by_user=self.request.user,
+                submission_state=data["submission_state"],
+                missing_info=data.get("missing_info", ""),
+                management_remarks=data.get("management_remarks", ""),
+                notes=data.get("notes", ""),
+                contributor=data.get("contributor"),
+            )
+        except ValidationError as exc:
+            for msg in exc.messages:
+                messages.error(self.request, msg)
+            return self.form_invalid(form)
+        messages.success(self.request, "Department submission saved.")
+        return redirect("meetings:dept_submission_status_detail", pk=self.meeting.pk)
+
+
+class MinutesEditorView(LoginRequiredMixin, MinutesEditRequiredMixin, UpdateView):
+    model = Meeting
+    form_class = MinutesEditorForm
+    context_object_name = "meeting"
+    template_name = "meetings/minutes_editor.html"
+
+    def get_queryset(self):
+        return (
+            Meeting.objects.all()
+            .select_related("type", "chair", "department", "created_by", "last_modified_by")
+            .prefetch_related(
+                "agenda_items__category",
+                "agenda_items__owner",
+                "agenda_items__action_item_links__action_item",
+                "department_submissions",
+                "attachments",
+            )
+        )
+
+    def dispatch(self, request, *args, **kwargs):
+        meeting = self.get_object()
+        if not can_submit_minutes(request.user, meeting):
+            from django.core.exceptions import PermissionDenied
+
+            raise PermissionDenied()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        meeting = self.object
+        ctx["agenda_items"] = list(
+            meeting.agenda_items.all()
+            .order_by("order")
+            .select_related("category", "owner", "department")
+        )
+        ctx["validation_rows"] = agenda_completeness(meeting)
+        ctx["can_submit"] = can_submit_minutes(self.request.user, meeting)
+        ctx["can_return"] = can_return_minutes(self.request.user, meeting)
+        return ctx
+
+    def form_valid(self, form):
+        form.instance.last_modified_by = self.request.user
+        response = super().form_valid(form)
+        messages.success(self.request, f"Minutes notes updated for {self.object.reference}.")
+        return response
+
+    def get_success_url(self):
+        return reverse("meetings:minutes_editor", args=[self.object.pk])
+
+
+class ActionItemFromMinutesCreate(LoginRequiredMixin, MinutesEditRequiredMixin, CreateView):
+    model = ActionItem
+    form_class = ActionItemCreateFromMinutesForm
+    template_name = "meetings/actionitem_create_from_minutes.html"
+
+    def get_meeting(self):
+        return get_object_or_404(Meeting, pk=self.kwargs["meeting_pk"])
+
+    def dispatch(self, request, *args, **kwargs):
+        self.meeting = self.get_meeting()
+        self.agenda_item = None
+        agenda_pk = request.GET.get("agenda_item") or request.POST.get("agenda_item")
+        if agenda_pk:
+            self.agenda_item = get_object_or_404(AgendaItem, pk=agenda_pk, meeting=self.meeting)
+        if not can_submit_minutes(request.user, self.meeting):
+            from django.core.exceptions import PermissionDenied
+
+            raise PermissionDenied()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kw = super().get_form_kwargs()
+        kw["source_meeting"] = self.meeting
+        kw["source_agenda_item"] = self.agenda_item
+        return kw
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["meeting"] = self.meeting
+        ctx["agenda_item"] = self.agenda_item
+        return ctx
+
+    def form_valid(self, form):
+        form.instance.created_by = self.request.user
+        form.instance.last_modified_by = self.request.user
+        with transaction.atomic():
+            response = super().form_valid(form)
+            if self.agenda_item is not None:
+                ActionItemLink.objects.get_or_create(
+                    agenda_item=self.agenda_item,
+                    action_item=self.object,
+                    defaults={"created_by": self.request.user},
+                )
+            log_audit_event(
+                record_type=_record_type(self.object),
+                record=self.object,
+                action=AuditLog.ACTION_CREATE,
+                user=self.request.user,
+                new_values={
+                    "title": self.object.title,
+                    "reference": self.object.reference,
+                    "source_meeting": str(self.meeting.pk),
+                    "source_agenda_item": str(self.agenda_item.pk) if self.agenda_item else None,
+                },
+                ip_address=_client_ip(self.request),
+            )
+        messages.success(self.request, f"Action item {self.object.reference} created from minutes.")
+        return response
+
+    def get_success_url(self):
+        return reverse("meetings:minutes_editor", args=[self.meeting.pk]) + "#agenda"
+
+
+class MeetingPreviewView(LoginRequiredMixin, DetailView):
+    model = Meeting
+    context_object_name = "meeting"
+    template_name = "meetings/meeting_preview.html"
+
+    def get_queryset(self):
+        return (
+            Meeting.objects.all()
+            .select_related("type", "chair", "department", "created_by", "last_modified_by")
+            .prefetch_related(
+                "attendance__user",
+                "agenda_items__category",
+                "agenda_items__owner",
+                "agenda_items__department",
+                "agenda_items__action_item_links__action_item__owner",
+                "attachments",
+                "approved_snapshots",
+                "status_history__transitioned_by",
+            )
+        )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        meeting = self.object
+        ctx["can_view_confidential"] = can_view_confidential_items(
+            self.request.user, meeting=meeting
+        )
+        return ctx
+
+
+class MeetingValidationSummaryView(LoginRequiredMixin, DetailView):
+    model = Meeting
+    context_object_name = "meeting"
+    template_name = "meetings/validation_summary.html"
+
+    def get_queryset(self):
+        return (
+            Meeting.objects.all()
+            .select_related("type", "chair", "department")
+            .prefetch_related(
+                "type__section_specs",
+                "department_submissions__department",
+                "agenda_items",
+            )
+        )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        meeting = self.object
+        rows = agenda_completeness(meeting)
+        ctx["validation_rows"] = rows
+        ctx["all_passed"] = all(r["passed"] for r in rows)
+        ctx["can_submit"] = can_submit_minutes(self.request.user, meeting)
+        return ctx
+
+
+class SubmitForReviewView(LoginRequiredMixin, MinutesEditRequiredMixin, DetailView):
+    model = Meeting
+    http_method_names = ["post"]
+
+    def post(self, request, *args, **kwargs):
+        meeting = self.get_object()
+        if not can_submit_minutes(request.user, meeting):
+            from django.core.exceptions import PermissionDenied
+
+            raise PermissionDenied()
+        reason = request.POST.get("reason", "").strip()
+        try:
+            submit_for_review(meeting, by_user=request.user, reason=reason)
+        except ValidationError as exc:
+            for msg in exc.messages:
+                messages.error(request, msg)
+            return redirect("meetings:meeting_validation_summary", pk=meeting.pk)
+        messages.success(request, f"Meeting {meeting.reference} submitted for review.")
+        return redirect("meetings:meeting_detail", pk=meeting.pk)
+
+
+class ReturnForCorrectionView(LoginRequiredMixin, MinutesReviewRequiredMixin, FormView):
+    form_class = ReturnForCorrectionForm
+    template_name = "meetings/return_for_correction_form.html"
+
+    def get_meeting(self):
+        return get_object_or_404(Meeting, pk=self.kwargs["pk"])
+
+    def dispatch(self, request, *args, **kwargs):
+        self.meeting = self.get_meeting()
+        if not can_return_minutes(request.user, self.meeting):
+            from django.core.exceptions import PermissionDenied
+
+            raise PermissionDenied()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["meeting"] = self.meeting
+        return ctx
+
+    def form_valid(self, form):
+        data = form.cleaned_data
+        marked = set(data.get("section_types") or [])
+        try:
+            return_for_correction(
+                self.meeting,
+                by_user=self.request.user,
+                reason=data["reason"],
+                marked_section_types=marked,
+                management_remarks=data.get("management_remarks", ""),
+            )
+        except ValidationError as exc:
+            for msg in exc.messages:
+                messages.error(self.request, msg)
+            return self.form_invalid(form)
+        messages.success(
+            self.request,
+            f"Meeting {self.meeting.reference} returned for correction.",
+        )
+        return redirect("meetings:meeting_detail", pk=self.meeting.pk)
+
+
+class ResubmitForReviewView(LoginRequiredMixin, MinutesEditRequiredMixin, DetailView):
+    model = Meeting
+    http_method_names = ["post"]
+
+    def post(self, request, *args, **kwargs):
+        meeting = self.get_object()
+        if not can_resubmit_minutes(request.user, meeting):
+            from django.core.exceptions import PermissionDenied
+
+            raise PermissionDenied()
+        reason = request.POST.get("reason", "").strip()
+        try:
+            resubmit_for_review(meeting, by_user=request.user, reason=reason)
+        except ValidationError as exc:
+            for msg in exc.messages:
+                messages.error(request, msg)
+            return redirect("meetings:meeting_detail", pk=meeting.pk)
+        messages.success(request, f"Meeting {meeting.reference} resubmitted for review.")
+        return redirect("meetings:meeting_detail", pk=meeting.pk)
+
+
+class ApproveMeetingView(LoginRequiredMixin, MinutesApproverRequiredMixin, DetailView):
+    model = Meeting
+    http_method_names = ["post"]
+
+    def post(self, request, *args, **kwargs):
+        meeting = self.get_object()
+        if not can_approve_meeting(request.user, meeting):
+            from django.core.exceptions import PermissionDenied
+
+            raise PermissionDenied()
+        reason = request.POST.get("reason", "").strip()
+        try:
+            approve_meeting(meeting, by_user=request.user, reason=reason)
+        except ValidationError as exc:
+            for msg in exc.messages:
+                messages.error(request, msg)
+            return redirect("meetings:meeting_detail", pk=meeting.pk)
+        messages.success(request, f"Meeting {meeting.reference} approved.")
+        return redirect("meetings:meeting_detail", pk=meeting.pk)
+
+
+class PublishMeetingView(LoginRequiredMixin, MinutesApproverRequiredMixin, DetailView):
+    model = Meeting
+    http_method_names = ["post"]
+
+    def post(self, request, *args, **kwargs):
+        meeting = self.get_object()
+        if not can_publish_meeting(request.user, meeting):
+            from django.core.exceptions import PermissionDenied
+
+            raise PermissionDenied()
+        reason = request.POST.get("reason", "").strip()
+        try:
+            publish_meeting(meeting, by_user=request.user, reason=reason)
+        except ValidationError as exc:
+            for msg in exc.messages:
+                messages.error(request, msg)
+            return redirect("meetings:meeting_detail", pk=meeting.pk)
+        messages.success(request, f"Meeting {meeting.reference} published.")
+        return redirect("meetings:meeting_detail", pk=meeting.pk)
+
+
+class CloseMeetingView(LoginRequiredMixin, MinutesApproverRequiredMixin, DetailView):
+    model = Meeting
+    http_method_names = ["post"]
+
+    def post(self, request, *args, **kwargs):
+        meeting = self.get_object()
+        if not can_close_meeting(request.user, meeting):
+            from django.core.exceptions import PermissionDenied
+
+            raise PermissionDenied()
+        reason = request.POST.get("reason", "").strip()
+        try:
+            close_meeting(meeting, by_user=request.user, reason=reason)
+        except ValidationError as exc:
+            for msg in exc.messages:
+                messages.error(request, msg)
+            return redirect("meetings:meeting_detail", pk=meeting.pk)
+        messages.success(request, f"Meeting {meeting.reference} closed.")
+        return redirect("meetings:meeting_detail", pk=meeting.pk)
+
+
+class ReopenMeetingView(LoginRequiredMixin, ReopenAuthorizedMixin, FormView):
+    template_name = "meetings/return_for_correction_form.html"
+
+    def get_form_class(self):
+        from django import forms as dj_forms
+
+        allowed = {
+            STATUS_APPROVED: [
+                STATUS_RETURNED_FOR_CORRECTION,
+                STATUS_APPROVED,
+                STATUS_CLOSED,
+                STATUS_PUBLISHED,
+            ],
+            STATUS_PUBLISHED: [
+                STATUS_RETURNED_FOR_CORRECTION,
+                STATUS_APPROVED,
+                STATUS_CLOSED,
+                STATUS_PUBLISHED,
+            ],
+            STATUS_CLOSED: [
+                STATUS_RETURNED_FOR_CORRECTION,
+                STATUS_APPROVED,
+                STATUS_PUBLISHED,
+            ],
+            STATUS_ARCHIVED: [STATUS_APPROVED, STATUS_PUBLISHED, STATUS_CLOSED],
+        }
+        current = self.meeting.status
+        target_labels = [
+            (s, label) for s, label in STATUS_CHOICES if s in allowed.get(current, set())
+        ]
+
+        class _ReopenForm(dj_forms.Form):
+            reason = dj_forms.CharField(
+                required=True,
+                label="Reopen Reason (required)",
+                widget=dj_forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            )
+            target_status = dj_forms.ChoiceField(
+                choices=target_labels,
+                label="Target Status",
+                widget=dj_forms.Select(attrs={"class": "form-select"}),
+            )
+
+        return _ReopenForm
+
+    def get_meeting(self):
+        return get_object_or_404(Meeting, pk=self.kwargs["pk"])
+
+    def dispatch(self, request, *args, **kwargs):
+        self.meeting = self.get_meeting()
+        if not can_reopen_meeting(request.user, self.meeting):
+            from django.core.exceptions import PermissionDenied
+
+            raise PermissionDenied()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["meeting"] = self.meeting
+        return ctx
+
+    def form_valid(self, form):
+        data = form.cleaned_data
+        try:
+            reopen_meeting(
+                self.meeting,
+                by_user=self.request.user,
+                target_status=data["target_status"],
+                reason=data["reason"],
+            )
+        except ValidationError as exc:
+            for msg in exc.messages:
+                messages.error(self.request, msg)
+            return self.form_invalid(form)
+        messages.success(
+            self.request,
+            f"Meeting {self.meeting.reference} reopened to {dict(STATUS_CHOICES).get(data['target_status'], data['target_status'])}.",
+        )
+        return redirect("meetings:meeting_detail", pk=self.meeting.pk)
+
+
+class MeetingVersionHistoryView(LoginRequiredMixin, DetailView):
+    model = Meeting
+    context_object_name = "meeting"
+    template_name = "meetings/version_history.html"
+
+    def get_queryset(self):
+        return (
+            Meeting.objects.all()
+            .select_related("type", "chair", "department")
+            .prefetch_related(
+                "approved_snapshots__approved_by",
+                "approved_snapshots__published_by",
+                "status_history__transitioned_by",
+            )
+        )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        meeting = self.object
+        timeline = []
+        for h in meeting.status_history.all():
+            timeline.append(
+                {
+                    "type": "status",
+                    "timestamp": h.transitioned_at,
+                    "actor": h.transitioned_by,
+                    "title": f"{h.from_status or 'DRAFT'} → {h.to_status}",
+                    "reason": h.reason,
+                }
+            )
+        for s in meeting.approved_snapshots.all():
+            timeline.append(
+                {
+                    "type": "snapshot",
+                    "timestamp": s.approved_at or s.created_at,
+                    "actor": s.approved_by or s.published_by,
+                    "title": f"Snapshot v{s.version} ({s.get_trigger_display()})",
+                    "snapshot": s,
+                }
+            )
+        timeline.sort(key=lambda e: e["timestamp"] or timezone.now(), reverse=True)
+        ctx["timeline"] = timeline
+        ctx["snapshots"] = list(meeting.approved_snapshots.all().order_by("-version"))
+        ctx["status_history"] = list(meeting.status_history.all().order_by("-transitioned_at"))
+        return ctx
+
+
+class ApprovedSnapshotDetailView(LoginRequiredMixin, DetailView):
+    model = ApprovedMeetingSnapshot
+    context_object_name = "snapshot"
+    template_name = "meetings/approved_snapshot_detail.html"
+
+    def get_queryset(self):
+        return ApprovedMeetingSnapshot.objects.select_related(
+            "meeting", "approved_by", "published_by"
+        )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        snapshot = self.object
+        payload = snapshot.payload or {}
+        ctx["payload"] = payload
+        ctx["meeting_meta"] = payload.get("meeting_meta", {})
+        ctx["attendance"] = payload.get("attendance", [])
+        ctx["agenda_items"] = payload.get("agenda_items", [])
+        ctx["discussions"] = payload.get("discussions", [])
+        ctx["decisions"] = payload.get("decisions", [])
+        ctx["action_items"] = payload.get("action_items", [])
+        ctx["sales_data"] = payload.get("sales_data", {})
+        ctx["status_history"] = payload.get("status_history", [])
+        ctx["approval_meta"] = payload.get("approval_meta", {})
+        ctx["snapshot_version"] = payload.get("version", snapshot.version)
+        return ctx
+
+
+class SnapshotPrintableView(LoginRequiredMixin, DetailView):
+    model = ApprovedMeetingSnapshot
+    context_object_name = "snapshot"
+    template_name = "meetings/snapshot_printable.html"
+
+    def get_queryset(self):
+        return ApprovedMeetingSnapshot.objects.select_related(
+            "meeting", "approved_by", "published_by"
+        )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        snapshot = self.object
+        payload = snapshot.payload or {}
+        ctx["payload"] = payload
+        ctx["meeting_meta"] = payload.get("meeting_meta", {})
+        ctx["attendance"] = payload.get("attendance", [])
+        ctx["agenda_items"] = payload.get("agenda_items", [])
+        ctx["discussions"] = payload.get("discussions", [])
+        ctx["decisions"] = payload.get("decisions", [])
+        ctx["action_items"] = payload.get("action_items", [])
+        ctx["sales_data"] = payload.get("sales_data", {})
+        ctx["approval_meta"] = payload.get("approval_meta", {})
+        ctx["snapshot_version"] = payload.get("version", snapshot.version)
+        return ctx

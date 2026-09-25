@@ -1,23 +1,37 @@
 {% if messages %}
-<div class="toast-container position-fixed top-0 end-0 p-3 z-3" style="z-index: 9999;">
+<div aria-live="polite" aria-atomic="true" class="visually-hidden-focusable" id="django-messages-alert-fallback">
     {% for message in messages %}
-    <div class="toast align-items-center text-bg-{{ message.tags }} border-0 fade show" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
-        <div class="d-flex">
-            <div class="toast-body d-flex align-items-center gap-2">
-                {% if message.level_tag == 'success' %}
-                <i class="bi bi-check-circle-fill fs-5"></i>
-                {% elif message.level_tag == 'error' %}
-                <i class="bi bi-exclamation-octagon-fill fs-5"></i>
-                {% elif message.level_tag == 'warning' %}
-                <i class="bi bi-exclamation-triangle-fill fs-5"></i>
-                {% else %}
-                <i class="bi bi-info-circle-fill fs-5"></i>
-                {% endif %}
-                <span>{{ message }}</span>
-            </div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-        </div>
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-2" role="alert">
+        {% if message.level_tag == 'success' %}
+        <i class="bi bi-check-circle-fill me-1"></i>
+        {% elif message.level_tag == 'error' %}
+        <i class="bi bi-exclamation-octagon-fill me-1"></i>
+        {% elif message.level_tag == 'warning' %}
+        <i class="bi bi-exclamation-triangle-fill me-1"></i>
+        {% else %}
+        <i class="bi bi-info-circle-fill me-1"></i>
+        {% endif %}
+        <span class="visually-hidden">{{ message.level_tag }}:</span>
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
     {% endfor %}
 </div>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    {% for message in messages %}
+    {% if message.level_tag == 'success' %}
+    window.IntranetUI.showToast({{ message|escapejs }}, 'success', 4500);
+    {% elif message.level_tag == 'error' %}
+    window.IntranetUI.showToast({{ message|escapejs }}, 'danger', 6000);
+    {% elif message.level_tag == 'warning' %}
+    window.IntranetUI.showToast({{ message|escapejs }}, 'warning', 5500);
+    {% elif message.level_tag == 'debug' %}
+    window.IntranetUI.showToast({{ message|escapejs }}, 'secondary', 4000);
+    {% else %}
+    window.IntranetUI.showToast({{ message|escapejs }}, 'info', 4500);
+    {% endif %}
+    {% endfor %}
+});
+</script>
 {% endif %}

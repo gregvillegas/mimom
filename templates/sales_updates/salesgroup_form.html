@@ -11,46 +11,44 @@
       <li class="breadcrumb-item active" aria-current="page">{% if object %}Edit · {{ object.name }}{% else %}New Group{% endif %}</li>
     </ol>
   </nav>
-  <form method="post" class="row g-4">
+  <form method="post" class="row g-4" id="salesGroupForm" aria-describedby="{% if form.non_field_errors %}validation-summary{% endif %}">
     {% csrf_token %}
     <div class="col-lg-8">
       <div class="card shadow-sm mb-4">
         <div class="card-header"><strong>{% if object %}Edit{% else %}Create{% endif %} Sales Group</strong></div>
         <div class="card-body">
-          {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
-          <div class="row g-3 mb-3">
-            <div class="col-md-4">
-              <label class="form-label">Code</label>
-              {{ form.code }}
-              {{ form.code.errors }}
+          <div class="scrollable-form-wrapper">
+            <div class="row g-3 form-grid">
+              <div class="col-12">
+                {% include 'includes/alerts_container.html' with errors=form.non_field_errors %}
+              </div>
+              <div class="col-md-4">
+                <label for="{{ form.code.id_for_label }}" class="form-label">Code</label>
+                {{ form.code }}{% if form.code.errors %}<div class="invalid-feedback">{% for err in form.code.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-md-8">
+                <label for="{{ form.name.id_for_label }}" class="form-label">Group name</label>
+                {{ form.name }}{% if form.name.errors %}<div class="invalid-feedback">{% for err in form.name.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-md-6">
+                <label for="{{ form.team.id_for_label }}" class="form-label">Team</label>
+                {{ form.team }}{% if form.team.errors %}<div class="invalid-feedback">{% for err in form.team.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-md-6">
+                <label for="{{ form.manager.id_for_label }}" class="form-label">Manager</label>
+                {{ form.manager }}{% if form.manager.errors %}<div class="invalid-feedback">{% for err in form.manager.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-12">
+                <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
+                {{ form.description }}{% if form.description.errors %}<div class="invalid-feedback">{% for err in form.description.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-12">
+                <label class="form-check mt-2">
+                  <input type="checkbox" name="{{ form.is_active.html_name }}" id="{{ form.is_active.id_for_label }}" class="form-check-input" {% if form.is_active.value %}checked{% endif %}>
+                  <span class="form-check-label">Active</span>
+                </label>
+              </div>
             </div>
-            <div class="col-md-8">
-              <label class="form-label">Group name</label>
-              {{ form.name }}
-              {{ form.name.errors }}
-            </div>
-          </div>
-          <div class="row g-3 mb-3">
-            <div class="col-md-6">
-              <label class="form-label">Team</label>
-              {{ form.team }}
-              {{ form.team.errors }}
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Manager</label>
-              {{ form.manager }}
-              {{ form.manager.errors }}
-            </div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Description</label>
-            {{ form.description }}
-            {{ form.description.errors }}
-          </div>
-          <div>
-            <label class="form-check">
-              {{ form.is_active }} <span class="form-check-label">Active</span>
-            </label>
           </div>
         </div>
       </div>
@@ -62,24 +60,30 @@
           </div>
           <div class="card-body">
             {{ membership_formset.management_form }}
-            <div class="table-responsive">
-              <table class="table table-sm align-middle mb-0">
-                <thead class="table-light">
+            <div class="scrollable-table-wrap" tabindex="0">
+              <table class="table table-sm align-middle mb-0 table-hover" data-table-hover>
+                <caption class="visually-hidden">Table: Memberships</caption>
+                <thead class="sticky-thead table-light">
                   <tr>
-                    <th>User</th><th>Role</th><th>Joined</th><th>Left</th><th>Active</th><th>Delete</th>
+                    <th scope="col">User</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Joined</th>
+                    <th scope="col">Left</th>
+                    <th scope="col">Active</th>
+                    <th scope="col">Delete</th>
                   </tr>
                 </thead>
                 <tbody>
                   {% for f in membership_formset %}
                     <tr>
-                      <td>
-                        {{ f.id }}{{ f.user }}{{ f.user.errors }}
+                      <td data-label="User">
+                        {{ f.id }}{{ f.user }}{% if f.user.errors %}<div class="invalid-feedback d-block">{% for err in f.user.errors %}{{ err }}{% endfor %}</div>{% endif %}
                       </td>
-                      <td>{{ f.role }}{{ f.role.errors }}</td>
-                      <td>{{ f.joined_on }}{{ f.joined_on.errors }}</td>
-                      <td>{{ f.left_on }}{{ f.left_on.errors }}</td>
-                      <td class="text-center">{{ f.is_active }}</td>
-                      <td class="text-center">{{ f.DELETE }}</td>
+                      <td data-label="Role">{{ f.role }}{% if f.role.errors %}<div class="invalid-feedback d-block">{% for err in f.role.errors %}{{ err }}{% endfor %}</div>{% endif %}</td>
+                      <td data-label="Joined">{{ f.joined_on }}{% if f.joined_on.errors %}<div class="invalid-feedback d-block">{% for err in f.joined_on.errors %}{{ err }}{% endfor %}</div>{% endif %}</td>
+                      <td data-label="Left">{{ f.left_on }}{% if f.left_on.errors %}<div class="invalid-feedback d-block">{% for err in f.left_on.errors %}{{ err }}{% endfor %}</div>{% endif %}</td>
+                      <td data-label="Active" class="text-center">{{ f.is_active }}</td>
+                      <td data-label="Delete" class="text-center">{{ f.DELETE }}</td>
                     </tr>
                   {% endfor %}
                 </tbody>
@@ -89,7 +93,7 @@
         </div>
       {% endif %}
 
-      <div class="d-flex justify-content-between">
+      <div class="sticky-submit-bar btn-primary-submit">
         <a class="btn btn-outline-secondary" href="{% url 'sales_updates:group_list' %}">Cancel</a>
         <button type="submit" class="btn btn-primary">{% if object %}Save changes{% else %}Create group{% endif %}</button>
       </div>

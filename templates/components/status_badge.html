@@ -1,0 +1,8 @@
+{% with text=text|default:"" variant=variant|default:"secondary" pill=pill|default:False icon=icon|default:"" %}
+<span class="badge {% if pill %}rounded-pill{% endif %} bg-{{ variant }}-subtle text-{{ variant }}" role="status" aria-label="{% if icon %}{{ icon|title }}: {% endif %}{{ text }}">
+    {% if icon %}
+        <i class="bi bi-{{ icon }} me-1" aria-hidden="true"></i>
+    {% endif %}
+    {{ text }}
+</span>
+{% endwith %}

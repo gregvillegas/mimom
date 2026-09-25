@@ -1,7 +1,9 @@
+from django import forms
 from django.contrib import messages
 from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
@@ -12,7 +14,9 @@ from apps.audit.models import AuditLog
 from apps.audit.services import log_audit_event
 from apps.core.permissions import (
     DepartmentAssignmentManagementRequiredMixin,
+    OrgManagementRequiredMixin,
     UserManagementRequiredMixin,
+    can_view_org,
 )
 
 from .forms import (
@@ -22,6 +26,7 @@ from .forms import (
     UserUpdateForm,
     build_membership_formset,
 )
+from .models import Department, ManagementTeam, Position
 
 User = get_user_model()
 
@@ -384,3 +389,381 @@ def password_change_done_view(request):
         "registration/password_change_done.html",
         {"breadcrumbs": breadcrumbs, "page_title": "Password Changed"},
     )
+
+
+class DepartmentListView(LoginRequiredMixin, ListView):
+    model = Department
+    template_name = "accounts/org_department_list.html"
+    context_object_name = "departments"
+    paginate_by = 25
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not can_view_org(request.user):
+            raise PermissionDenied()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        qs = Department.objects.select_related("head", "parent").order_by("name")
+        query = self.request.GET.get("q", "").strip()
+        if query:
+            qs = qs.filter(
+                models.Q(name__icontains=query) | models.Q(code__icontains=query)
+            )
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["page_title"] = "Departments"
+        ctx["query"] = self.request.GET.get("q", "")
+        ctx["breadcrumbs"] = [
+            ("Home", reverse("home")),
+            ("Organization", None),
+            ("Departments", None),
+        ]
+        return ctx
+
+
+class DepartmentDetailView(LoginRequiredMixin, DetailView):
+    model = Department
+    template_name = "accounts/org_department_detail.html"
+    context_object_name = "department"
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not can_view_org(request.user):
+            raise PermissionDenied()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return Department.objects.prefetch_related(
+            "memberships__user", "memberships__position"
+        )
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        obj = self.object
+        ctx["page_title"] = f"Dept {obj.name}"
+        ctx["memberships"] = obj.memberships.select_related("user", "position").order_by(
+            "-is_primary", "user__display_name", "user__username"
+        )
+        ctx["breadcrumbs"] = [
+            ("Home", reverse("home")),
+            ("Organization", None),
+            ("Departments", reverse("accounts:department_list")),
+            (obj.name, None),
+        ]
+        return ctx
+
+
+class _DepartmentForm(forms.ModelForm):
+    class Meta:
+        model = Department
+        fields = ["name", "code", "description", "head", "parent", "is_active"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for fname, f in self.fields.items():
+            if isinstance(f.widget, forms.CheckboxInput):
+                continue
+            f.widget.attrs.setdefault("class", "form-control")
+        self.fields["head"].queryset = User.objects.filter(is_active=True).order_by(
+            "display_name", "username"
+        )
+        self.fields["parent"].queryset = Department.objects.filter(is_active=True).order_by(
+            "name"
+        )
+
+
+class DepartmentCreateView(LoginRequiredMixin, OrgManagementRequiredMixin, CreateView):
+    model = Department
+    form_class = _DepartmentForm
+    template_name = "accounts/user_form.html"
+    success_url = reverse_lazy("accounts:department_list")
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["page_title"] = "Create Department"
+        ctx["form_mode"] = "create"
+        ctx["breadcrumbs"] = [
+            ("Home", reverse("home")),
+            ("Organization", None),
+            ("Departments", reverse("accounts:department_list")),
+            ("Create", None),
+        ]
+        return ctx
+
+    def form_valid(self, form):
+        with transaction.atomic():
+            response = super().form_valid(form)
+            log_audit_event(
+                record_type="accounts.Department",
+                record=self.object,
+                action=AuditLog.ACTION_CREATE,
+                user=self.request.user,
+                ip_address=_client_ip(self.request),
+                new_values={
+                    "name": self.object.name,
+                    "code": self.object.code,
+                    "head_id": str(self.object.head_id) if self.object.head_id else None,
+                    "parent_id": str(self.object.parent_id) if self.object.parent_id else None,
+                    "is_active": self.object.is_active,
+                },
+                reason="Created via organization management UI",
+            )
+        messages.success(self.request, f"Department {self.object.name} created successfully.")
+        return response
+
+
+class DepartmentUpdateView(LoginRequiredMixin, OrgManagementRequiredMixin, UpdateView):
+    model = Department
+    form_class = _DepartmentForm
+    template_name = "accounts/user_form.html"
+    success_url = reverse_lazy("accounts:department_list")
+    pk_url_kwarg = "pk"
+
+    def get_object(self, queryset=None):
+        obj = get_object_or_404(Department, pk=self.kwargs["pk"])
+        obj._previous_values = {
+            "name": obj.name,
+            "code": obj.code,
+            "description": obj.description,
+            "head_id": str(obj.head_id) if obj.head_id else None,
+            "parent_id": str(obj.parent_id) if obj.parent_id else None,
+            "is_active": obj.is_active,
+        }
+        return obj
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["page_title"] = f"Edit Department: {self.object.name}"
+        ctx["form_mode"] = "edit"
+        ctx["breadcrumbs"] = [
+            ("Home", reverse("home")),
+            ("Organization", None),
+            ("Departments", reverse("accounts:department_list")),
+            (f"Edit {self.object.name}", None),
+        ]
+        return ctx
+
+    def form_valid(self, form):
+        previous = getattr(self.object, "_previous_values", {})
+        with transaction.atomic():
+            response = super().form_valid(form)
+            log_audit_event(
+                record_type="accounts.Department",
+                record=self.object,
+                action=AuditLog.ACTION_UPDATE,
+                user=self.request.user,
+                ip_address=_client_ip(self.request),
+                previous_values=previous,
+                new_values={
+                    "name": self.object.name,
+                    "code": self.object.code,
+                    "description": self.object.description,
+                    "head_id": str(self.object.head_id) if self.object.head_id else None,
+                    "parent_id": str(self.object.parent_id) if self.object.parent_id else None,
+                    "is_active": self.object.is_active,
+                },
+                reason="Updated via organization management UI",
+            )
+        messages.success(self.request, f"Department {self.object.name} updated successfully.")
+        return response
+
+
+class PositionListView(LoginRequiredMixin, ListView):
+    model = Position
+    template_name = "accounts/org_position_list.html"
+    context_object_name = "positions"
+    paginate_by = 25
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not can_view_org(request.user):
+            raise PermissionDenied()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        qs = Position.objects.order_by("level", "name")
+        query = self.request.GET.get("q", "").strip()
+        if query:
+            qs = qs.filter(
+                models.Q(name__icontains=query) | models.Q(code__icontains=query)
+            )
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["page_title"] = "Positions"
+        ctx["query"] = self.request.GET.get("q", "")
+        ctx["breadcrumbs"] = [
+            ("Home", reverse("home")),
+            ("Organization", None),
+            ("Positions", None),
+        ]
+        return ctx
+
+
+class PositionDetailView(LoginRequiredMixin, DetailView):
+    model = Position
+    template_name = "accounts/org_position_detail.html"
+    context_object_name = "position"
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not can_view_org(request.user):
+            raise PermissionDenied()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        obj = self.object
+        ctx["page_title"] = f"Position {obj.name}"
+        ctx["incumbents"] = obj.department_memberships.select_related(
+            "user", "department"
+        ).filter(is_active=True).order_by(
+            "department__name", "user__display_name", "user__username"
+        )
+        ctx["breadcrumbs"] = [
+            ("Home", reverse("home")),
+            ("Organization", None),
+            ("Positions", reverse("accounts:position_list")),
+            (obj.name, None),
+        ]
+        return ctx
+
+
+class _PositionForm(forms.ModelForm):
+    class Meta:
+        model = Position
+        fields = ["name", "code", "description", "level", "is_active"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for fname, f in self.fields.items():
+            if isinstance(f.widget, forms.CheckboxInput):
+                continue
+            f.widget.attrs.setdefault("class", "form-control")
+
+
+class PositionCreateView(LoginRequiredMixin, OrgManagementRequiredMixin, CreateView):
+    model = Position
+    form_class = _PositionForm
+    template_name = "accounts/user_form.html"
+    success_url = reverse_lazy("accounts:position_list")
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["page_title"] = "Create Position"
+        ctx["form_mode"] = "create"
+        ctx["breadcrumbs"] = [
+            ("Home", reverse("home")),
+            ("Organization", None),
+            ("Positions", reverse("accounts:position_list")),
+            ("Create", None),
+        ]
+        return ctx
+
+    def form_valid(self, form):
+        with transaction.atomic():
+            response = super().form_valid(form)
+            log_audit_event(
+                record_type="accounts.Position",
+                record=self.object,
+                action=AuditLog.ACTION_CREATE,
+                user=self.request.user,
+                ip_address=_client_ip(self.request),
+                new_values={
+                    "name": self.object.name,
+                    "code": self.object.code,
+                    "level": self.object.level,
+                    "is_active": self.object.is_active,
+                },
+                reason="Created via organization management UI",
+            )
+        messages.success(self.request, f"Position {self.object.name} created successfully.")
+        return response
+
+
+class PositionUpdateView(LoginRequiredMixin, OrgManagementRequiredMixin, UpdateView):
+    model = Position
+    form_class = _PositionForm
+    template_name = "accounts/user_form.html"
+    success_url = reverse_lazy("accounts:position_list")
+    pk_url_kwarg = "pk"
+
+    def get_object(self, queryset=None):
+        obj = get_object_or_404(Position, pk=self.kwargs["pk"])
+        obj._previous_values = {
+            "name": obj.name,
+            "code": obj.code,
+            "description": obj.description,
+            "level": obj.level,
+            "is_active": obj.is_active,
+        }
+        return obj
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["page_title"] = f"Edit Position: {self.object.name}"
+        ctx["form_mode"] = "edit"
+        ctx["breadcrumbs"] = [
+            ("Home", reverse("home")),
+            ("Organization", None),
+            ("Positions", reverse("accounts:position_list")),
+            (f"Edit {self.object.name}", None),
+        ]
+        return ctx
+
+    def form_valid(self, form):
+        previous = getattr(self.object, "_previous_values", {})
+        with transaction.atomic():
+            response = super().form_valid(form)
+            log_audit_event(
+                record_type="accounts.Position",
+                record=self.object,
+                action=AuditLog.ACTION_UPDATE,
+                user=self.request.user,
+                ip_address=_client_ip(self.request),
+                previous_values=previous,
+                new_values={
+                    "name": self.object.name,
+                    "code": self.object.code,
+                    "description": self.object.description,
+                    "level": self.object.level,
+                    "is_active": self.object.is_active,
+                },
+                reason="Updated via organization management UI",
+            )
+        messages.success(self.request, f"Position {self.object.name} updated successfully.")
+        return response
+
+
+class OrgTeamsListView(LoginRequiredMixin, ListView):
+    template_name = "accounts/org_team_list.html"
+    context_object_name = "management_teams"
+    paginate_by = None
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not can_view_org(request.user):
+            raise PermissionDenied()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        return ManagementTeam.objects.prefetch_related(
+            "memberships__user"
+        ).order_by("name")
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        from apps.sales_updates.models import SalesTeam
+
+        ctx["page_title"] = "Teams"
+        ctx["breadcrumbs"] = [
+            ("Home", reverse("home")),
+            ("Organization", None),
+            ("Teams", None),
+        ]
+        ctx["sales_teams"] = SalesTeam.objects.prefetch_related(
+            "groups__memberships__user"
+        ).filter(is_active=True).order_by("name")
+        ctx["management_teams_all"] = ManagementTeam.objects.prefetch_related(
+            "memberships__user"
+        ).filter(is_active=True).order_by("name")
+        return ctx

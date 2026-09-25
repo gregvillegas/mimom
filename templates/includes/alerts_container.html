@@ -1,0 +1,43 @@
+{% if errors %}
+<div class="alert alert-danger d-flex align-items-start gap-2 mb-4" role="alert" id="validation-summary">
+    <i class="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" aria-hidden="true"></i>
+    <div>
+        <h6 class="alert-heading mb-2" id="validation-summary-heading">Please correct the following errors</h6>
+        <ul class="mb-0 ps-3">
+            {% for error in errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% elif form %}
+{% if form.non_field_errors %}
+<div class="alert alert-danger d-flex align-items-start gap-2 mb-4" role="alert" id="form-nonfield-errors">
+    <i class="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0" aria-hidden="true"></i>
+    <div>
+        <h6 class="alert-heading mb-2" id="form-nonfield-errors-heading">Form validation errors</h6>
+        <ul class="mb-0 ps-3">
+            {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+{% for field in form %}
+{% if field.errors %}
+<div class="alert alert-danger d-flex align-items-start gap-2 mb-2" role="alert" aria-labelledby="field-{{ field.name }}-errors-heading" id="field-{{ field.name }}-errors">
+    <i class="bi bi-exclamation-circle-fill mt-1 flex-shrink-0" aria-hidden="true"></i>
+    <div>
+        <h6 class="alert-heading mb-1 small" id="field-{{ field.name }}-errors-heading">{{ field.label }}:</h6>
+        <ul class="mb-0 ps-3 small">
+            {% for error in field.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+{% endif %}

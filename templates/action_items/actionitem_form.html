@@ -20,62 +20,59 @@
     </div>
   </div>
 
-  <form method="post" id="action-form" class="row g-4" enctype="multipart/form-data">
+  <form method="post" id="action-form" class="row g-4" enctype="multipart/form-data" aria-describedby="{% if form.non_field_errors %}validation-summary{% endif %}">
     {% csrf_token %}
     <div class="col-lg-8">
       <div class="card mb-4 shadow-sm">
         <div class="card-header"><strong>Details</strong></div>
         <div class="card-body">
-          {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
-          <div class="mb-3">
-            <label class="form-label">Title</label>
-            {{ form.title }}
-            {{ form.title.errors }}
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Description</label>
-            {{ form.description }}
-            {{ form.description.errors }}
-          </div>
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label">Priority</label>
-              {{ form.priority }}
-              {{ form.priority.errors }}
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Status</label>
-              {{ form.status }}
-              {{ form.status.errors }}
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Progress (%)</label>
-              {{ form.progress_pct }}
-              {{ form.progress_pct.errors }}
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Due Date</label>
-              {{ form.due_date }}
-              {{ form.due_date.errors }}
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Department</label>
-              {{ form.department }}
-              {{ form.department.errors }}
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Owner</label>
-              {{ form.owner }}
-              {{ form.owner.errors }}
-            </div>
-            <div class="col-12">
-              <label class="form-label">Blockers</label>
-              {{ form.blockers }}
-              <div class="form-text">Clear before marking Complete.</div>
-            </div>
-            <div class="col-12">
-              <label class="form-label">Next Steps</label>
-              {{ form.next_steps }}
+          <div class="scrollable-form-wrapper">
+            <div class="row g-3 form-grid">
+              <div class="col-12">
+                {% include 'includes/alerts_container.html' with errors=form.non_field_errors %}
+              </div>
+              <div class="col-12">
+                <label for="{{ form.title.id_for_label }}" class="form-label">Title</label>
+                {{ form.title }}{% if form.title.errors %}<div class="invalid-feedback">{% for err in form.title.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-12">
+                <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
+                {{ form.description }}{% if form.description.errors %}<div class="invalid-feedback">{% for err in form.description.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-md-6">
+                <label for="{{ form.priority.id_for_label }}" class="form-label">Priority</label>
+                {{ form.priority }}{% if form.priority.errors %}<div class="invalid-feedback">{% for err in form.priority.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-md-6">
+                <label for="{{ form.status.id_for_label }}" class="form-label">Status</label>
+                {{ form.status }}{% if form.status.errors %}<div class="invalid-feedback">{% for err in form.status.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-md-6">
+                <label for="{{ form.progress_pct.id_for_label }}" class="form-label">Progress (%)</label>
+                {{ form.progress_pct }}{% if form.progress_pct.errors %}<div class="invalid-feedback">{% for err in form.progress_pct.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-md-6">
+                <label for="{{ form.due_date.id_for_label }}" class="form-label">Due Date</label>
+                {{ form.due_date }}{% if form.due_date.errors %}<div class="invalid-feedback">{% for err in form.due_date.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-md-6">
+                <label for="{{ form.department.id_for_label }}" class="form-label">Department</label>
+                {{ form.department }}{% if form.department.errors %}<div class="invalid-feedback">{% for err in form.department.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-md-6">
+                <label for="{{ form.owner.id_for_label }}" class="form-label">Owner</label>
+                {{ form.owner }}{% if form.owner.errors %}<div class="invalid-feedback">{% for err in form.owner.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-12">
+                <label for="{{ form.blockers.id_for_label }}" class="form-label">Blockers</label>
+                {{ form.blockers }}
+                <div class="form-text">Clear before marking Complete.</div>
+                {% if form.blockers.errors %}<div class="invalid-feedback">{% for err in form.blockers.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
+              <div class="col-12">
+                <label for="{{ form.next_steps.id_for_label }}" class="form-label">Next Steps</label>
+                {{ form.next_steps }}{% if form.next_steps.errors %}<div class="invalid-feedback">{% for err in form.next_steps.errors %}{{ err }}{% endfor %}</div>{% endif %}
+              </div>
             </div>
           </div>
         </div>
@@ -89,19 +86,26 @@
         </div>
         <div class="card-body p-0">
           {{ assignee_formset.management_form }}
-          <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0">
-              <thead class="table-light">
-                <tr><th>User</th><th>Primary</th><th>Supporting</th><th>Notes</th><th>Remove</th></tr>
+          <div class="scrollable-table-wrap" tabindex="0">
+            <table class="table table-sm align-middle mb-0 table-hover" data-table-hover>
+              <caption class="visually-hidden">Table: Assignees</caption>
+              <thead class="sticky-thead table-light">
+                <tr>
+                  <th scope="col">User</th>
+                  <th scope="col">Primary</th>
+                  <th scope="col">Supporting</th>
+                  <th scope="col">Notes</th>
+                  <th scope="col">Remove</th>
+                </tr>
               </thead>
               <tbody>
-                {% for form in assignee_formset.forms %}
+                {% for f in assignee_formset.forms %}
                   <tr>
-                    <td>{{ form.id }}{{ form.user }}</td>
-                    <td>{{ form.is_primary }}</td>
-                    <td>{{ form.is_supporting }}</td>
-                    <td>{{ form.notes }}</td>
-                    <td>{{ form.DELETE }}</td>
+                    <td data-label="User">{{ f.id }}{{ f.user }}</td>
+                    <td data-label="Primary" class="text-center">{{ f.is_primary }}</td>
+                    <td data-label="Supporting" class="text-center">{{ f.is_supporting }}</td>
+                    <td data-label="Notes">{{ f.notes }}</td>
+                    <td data-label="Remove" class="text-center">{{ f.DELETE }}</td>
                   </tr>
                 {% endfor %}
               </tbody>
@@ -109,7 +113,10 @@
           </div>
         </div>
       </div>
-      <div class="d-flex gap-2">
+    </div>
+
+    <div class="col-12">
+      <div class="sticky-submit-bar btn-primary-submit">
         <a class="btn btn-outline-secondary" href="{% if action.pk %}{% url 'action_items:actionitem_detail' action.pk %}{% else %}{% url 'action_items:actionitem_list' %}{% endif %}">Cancel</a>
         <button class="btn btn-primary ms-auto">{{ mode }}</button>
       </div>

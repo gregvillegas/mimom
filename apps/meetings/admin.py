@@ -1,14 +1,18 @@
 from django.contrib import admin
 
 from apps.meetings.models import (
+    ActionItemLink,
     AgendaCategory,
     AgendaItem,
     AgendaItemAttachment,
+    ApprovedMeetingSnapshot,
+    DepartmentSubmission,
     Meeting,
     MeetingAttachment,
     MeetingAttendance,
     MeetingStatusHistory,
     MeetingType,
+    MinutesSectionSpec,
 )
 
 
@@ -65,6 +69,31 @@ class MeetingAttachmentInline(admin.TabularInline):
     readonly_fields = ("uploaded_by",)
 
 
+class DepartmentSubmissionInline(admin.TabularInline):
+    model = DepartmentSubmission
+    extra = 0
+    fields = (
+        "department",
+        "contributor",
+        "submission_state",
+        "last_updated_at",
+        "last_submitted_at",
+        "submitted_by",
+        "missing_info",
+        "management_remarks",
+    )
+    readonly_fields = ("last_updated_at", "last_submitted_at")
+    autocomplete_fields = ("department", "contributor", "submitted_by")
+
+
+class ActionItemLinkInline(admin.TabularInline):
+    model = ActionItemLink
+    extra = 0
+    fields = ("agenda_item", "action_item", "created_by", "created_at")
+    readonly_fields = ("created_by", "created_at")
+    autocomplete_fields = ("agenda_item", "action_item")
+
+
 @admin.register(MeetingType)
 class MeetingTypeAdmin(admin.ModelAdmin):
     list_display = ("name", "code", "is_active", "default_duration_minutes")
@@ -108,6 +137,7 @@ class MeetingAdmin(admin.ModelAdmin):
         MeetingStatusHistoryInline,
         MeetingAttendanceInline,
         AgendaItemInline,
+        DepartmentSubmissionInline,
         MeetingAttachmentInline,
     ]
 
@@ -180,6 +210,9 @@ class AgendaItemAdmin(admin.ModelAdmin):
         "carried_forward_from",
     )
     ordering = ("meeting__start_at", "order")
+    inlines = [
+        ActionItemLinkInline,
+    ]
 
 
 @admin.register(MeetingAttachment)
@@ -222,3 +255,105 @@ class AgendaItemAttachmentAdmin(admin.ModelAdmin):
         return obj.display_name or obj.file.name.split("/")[-1]
 
     display_name_or_file.short_description = "File"
+
+
+@admin.register(MinutesSectionSpec)
+class MinutesSectionSpecAdmin(admin.ModelAdmin):
+    list_display = (
+        "meeting_type",
+        "section_type",
+        "order",
+        "name",
+        "is_required",
+    )
+    list_filter = ("is_required", "section_type", "meeting_type")
+    search_fields = ("name", "description", "meeting_type__name", "meeting_type__code")
+    ordering = ("meeting_type", "order", "name")
+    autocomplete_fields = ("meeting_type",)
+
+
+@admin.register(DepartmentSubmission)
+class DepartmentSubmissionAdmin(admin.ModelAdmin):
+    list_display = (
+        "meeting",
+        "department",
+        "contributor",
+        "submission_state",
+        "last_updated_at",
+        "last_submitted_at",
+        "submitted_by",
+    )
+    list_filter = (
+        "submission_state",
+        "meeting__status",
+        "meeting__type",
+        "department",
+    )
+    search_fields = (
+        "meeting__reference",
+        "meeting__title",
+        "department__name",
+        "missing_info",
+        "management_remarks",
+    )
+    date_hierarchy = "last_submitted_at"
+    readonly_fields = ("last_updated_at", "last_submitted_at")
+    autocomplete_fields = ("meeting", "department", "contributor", "submitted_by")
+
+
+@admin.register(ActionItemLink)
+class ActionItemLinkAdmin(admin.ModelAdmin):
+    list_display = (
+        "agenda_item",
+        "action_item",
+        "created_by",
+        "created_at",
+    )
+    list_filter = ("created_at",)
+    search_fields = (
+        "agenda_item__title",
+        "agenda_item__meeting__reference",
+        "action_item__reference",
+        "action_item__title",
+    )
+    date_hierarchy = "created_at"
+    readonly_fields = ("created_by", "created_at")
+    autocomplete_fields = ("agenda_item", "action_item")
+
+
+@admin.register(ApprovedMeetingSnapshot)
+class ApprovedMeetingSnapshotAdmin(admin.ModelAdmin):
+    list_display = (
+        "meeting",
+        "version",
+        "trigger",
+        "approved_at",
+        "approved_by",
+        "published_at",
+    )
+    list_filter = ("trigger", "approved_at", "published_at")
+    search_fields = (
+        "meeting__reference",
+        "meeting__title",
+        "notes",
+    )
+    date_hierarchy = "approved_at"
+    readonly_fields = (
+        "meeting",
+        "version",
+        "trigger",
+        "payload",
+        "approved_at",
+        "approved_by",
+        "published_at",
+        "published_by",
+    )
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

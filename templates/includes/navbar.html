@@ -1,13 +1,17 @@
-<nav class="navbar navbar-expand-md navbar-dark bg-primary sticky-top shadow-sm border-bottom border-primary-subtle">
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top shadow-sm border-bottom border-primary-subtle">
     <div class="container-fluid">
-        <button class="navbar-toggler d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas" aria-label="Toggle navigation">
+        <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbarDraw" aria-controls="offcanvasNavbarDraw" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
 
-        <a class="navbar-brand fw-semibold me-auto me-md-3 d-flex align-items-center gap-2" href="{% url 'home' %}">
-            <i class="bi bi-journal-text fs-4"></i>
-            <span class="d-none d-sm-inline">MIMOM Intranet</span>
+        <a class="navbar-brand fw-semibold me-auto me-lg-3 d-flex align-items-center gap-1 gap-sm-2" href="{% url 'home' %}">
+            <i class="bi bi-journal-text fs-5 fs-sm-4"></i>
+            <span class="d-none d-sm-inline fs-6 fs-md-5">MIMOM Intranet</span>
         </a>
+
+        <form class="d-none d-md-flex col-12 col-md-4 col-lg-3 mx-auto mx-md-3 mb-2 mb-md-0" role="search" onsubmit="return false;">
+            <input type="search" class="form-control form-control-sm form-control-md" placeholder="Search..." aria-label="Search">
+        </form>
 
         <ul class="navbar-nav flex-row align-items-center ms-auto gap-1">
             <li class="nav-item">
@@ -24,7 +28,7 @@
                     <span class="d-flex align-items-center justify-content-center rounded-circle bg-white text-primary fw-semibold" style="width: 30px; height: 30px; font-size: 0.8rem;">
                         {{ user.get_initials }}
                     </span>
-                    <span class="d-none d-md-inline">{{ user.get_display_name }}</span>
+                    <span class="d-none d-lg-inline">{{ user.get_display_name }}</span>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 mt-2">
                     <li><h6 class="dropdown-header text-muted small">Signed in as</h6></li>

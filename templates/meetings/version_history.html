@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% block title %}Version History · {{ meeting.reference }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+    <div>
+        <div class="d-flex gap-2 align-items-center mb-1">
+            <span class="text-muted small font-monospace">{{ meeting.reference }}</span>
+            {% include 'meetings/_partials/status_badges.html' with meeting=meeting %}
+        </div>
+        <h1 class="h3 fw-bold mb-1">Version History</h1>
+        <p class="text-muted mb-0">{{ meeting.title }}</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{% url 'meetings:meeting_detail' meeting.pk %}" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2">
+            <i class="bi bi-arrow-left"></i> Back to Meeting
+        </a>
+        <a href="{% url 'meetings:prep_dashboard' %}" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2">
+            <i class="bi bi-grid-1x2"></i> Prep Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-xl-8">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom py-3">
+                <h2 class="h6 fw-semibold mb-0">
+                    <i class="bi bi-clock-history text-primary me-1"></i> Status Transition Timeline
+                </h2>
+            </div>
+            <div class="card-body">
+                {% if status_history %}
+                <div class="position-relative">
+                    <div class="timeline-line"></div>
+                    <ol class="list-group list-group-flush">
+                        {% for h in status_history %}
+                        <li class="list-group-item border-0 ps-0 pb-4 position-relative">
+                            <div class="d-flex gap-3">
+                                <div class="flex-shrink-0 z-1 position-relative">
+                                    <div class="timeline-dot {% if h.to_status == 'APPROVED' or h.to_status == 'PUBLISHED' %}bg-success{% elif h.to_status == 'FOR_REVIEW' %}bg-info{% elif h.to_status == 'RETURNED' %}bg-warning{% elif h.to_status == 'CLOSED' %}bg-secondary{% elif h.to_status == 'ARCHIVED' %}bg-dark{% else %}bg-primary{% endif %}"></div>
+                                </div>
+                                <div class="flex-grow-1 pt-0">
+                                    <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+                                        {% if h.from_status %}
+                                        <span class="badge bg-light text-dark border border-light">{{ h.from_status }}</span>
+                                        <i class="bi bi-arrow-right text-muted"></i>
+                                        {% endif %}
+                                        <span class="badge {% if h.to_status == 'APPROVED' %}bg-success{% elif h.to_status == 'PUBLISHED' %}bg-success{% elif h.to_status == 'FOR_REVIEW' %}bg-info{% elif h.to_status == 'RETURNED' %}bg-warning{% elif h.to_status == 'CLOSED' %}bg-secondary{% elif h.to_status == 'ARCHIVED' %}bg-dark{% else %}bg-primary{% endif %}">
+                                            {{ h.to_status }}
+                                        </span>
+                                        <span class="small text-muted ms-auto">
+                                            {{ h.transitioned_at|date:"M d, Y H:i" }}
+                                            {% if h.transitioned_by %}
+                                                &nbsp;· by <strong>{{ h.transitioned_by.get_display_name }}</strong>
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    {% if h.reason %}
+                                    <div class="small mt-2 p-2 bg-light rounded whitespace-pre-wrap">{{ h.reason }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ol>
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <div class="empty-state">
+                        <i class="bi bi-clock-history display-4 d-block mb-2"></i>
+                        <div class="fw-medium">No transitions yet</div>
+                        <div class="small">Status changes will appear here as the meeting moves through the workflow.</div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-4">
+        <div class="position-sticky" style="top: 1rem;">
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h3 class="h6 fw-semibold mb-0">
+                        <i class="bi bi-patch-check text-primary me-1"></i> Approved Meeting Snapshots
+                    </h3>
+                </div>
+                <div class="card-body p-0">
+                    {% if snapshots %}
+                    <div class="list-group list-group-flush">
+                        {% for snap in snapshots %}
+                        <div class="list-group-item p-3">
+                            <div class="border border-success-subtle rounded-3 p-3 bg-success-subtle bg-opacity-25">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div>
+                                        <div class="fw-bold text-success fs-5 mb-1">v{{ snap.version }}</div>
+                                        <span class="badge {% if snap.trigger == 'APPROVE' %}bg-success{% elif snap.trigger == 'PUBLISH' %}bg-primary{% elif snap.trigger == 'SUBMIT' %}bg-info{% else %}bg-secondary{% endif %} small">
+                                            {{ snap.get_trigger_display }}
+                                        </span>
+                                    </div>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'meetings:approved_snapshot_detail' snap.pk %}" class="btn btn-outline-success">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a href="{% url 'meetings:snapshot_printable' snap.pk %}" class="btn btn-outline-primary" target="_blank">
+                                            <i class="bi bi-printer"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="small text-muted mb-2">
+                                    <i class="bi bi-calendar3 me-1"></i>
+                                    Created: {{ snap.created_at|date:"M d, Y H:i" }}
+                                </div>
+                                {% if snap.approved_at %}
+                                <div class="small text-muted mb-2">
+                                    <i class="bi bi-patch-check me-1 text-success"></i>
+                                    Approved: {{ snap.approved_at|date:"M d, Y H:i" }}
+                                    {% if snap.approved_by %}
+                                        · {{ snap.approved_by.get_display_name }}
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                {% if snap.published_at %}
+                                <div class="small text-muted">
+                                    <i class="bi bi-send me-1 text-primary"></i>
+                                    Published: {{ snap.published_at|date:"M d, Y H:i" }}
+                                    {% if snap.published_by %}
+                                        · {{ snap.published_by.get_display_name }}
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                {% if snap.notes %}
+                                <div class="mt-2 small p-2 bg-white rounded">
+                                    <div class="text-muted fw-semibold mb-1">Notes</div>
+                                    <div class="whitespace-pre-wrap">{{ snap.notes }}</div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="p-4 text-center text-muted small">
+                        <i class="bi bi-shield-lock display-4 d-block mb-2 text-secondary"></i>
+                        <div class="fw-medium mb-1">No snapshots yet</div>
+                        <div>Approved or published meetings create immutable snapshots.</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h3 class="h6 fw-semibold mb-0">
+                        <i class="bi bi-shield-lock text-primary me-1"></i> Immutability Guarantee
+                    </h3>
+                </div>
+                <div class="card-body small">
+                    <p class="mb-2">Once a snapshot is created at <strong>Approval</strong> or <strong>Publication</strong>:</p>
+                    <ul class="mb-0">
+                        <li class="mb-1">The stored payload is <strong>never modified</strong>.</li>
+                        <li class="mb-1">The snapshot view renders directly from its JSON payload.</li>
+                        <li class="mb-1">Edits to the live meeting do <strong>not</strong> change past snapshots.</li>
+                        <li>Each version is preserved for full audit traceability.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline-line {
+    position: absolute;
+    left: 7px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: #e5e7eb;
+    z-index: 0;
+}
+.timeline-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 3px solid #ffffff;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.08);
+}
+</style>
+{% endblock %}

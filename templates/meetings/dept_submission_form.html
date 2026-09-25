@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% block title %}Department Submission Form · {{ meeting.reference }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+    <div>
+        <div class="d-flex gap-2 align-items-center mb-1">
+            <span class="text-muted small font-monospace">{{ meeting.reference }}</span>
+            {% include 'meetings/_partials/status_badges.html' with meeting=meeting %}
+        </div>
+        <h1 class="h3 fw-bold mb-1">Department Submission</h1>
+        <p class="text-muted mb-0">{{ meeting.title }}</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{% url 'meetings:dept_submission_status_detail' meeting.pk %}" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2">
+            <i class="bi bi-arrow-left"></i> Submission Status
+        </a>
+        <a href="{% url 'meetings:prep_dashboard' %}" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2">
+            <i class="bi bi-grid-1x2"></i> Prep Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h2 class="h6 fw-semibold mb-0">Submit Department Update</h2>
+            </div>
+            <div class="card-body">
+                <form method="post" id="deptSubmissionForm" aria-describedby="{% if form.non_field_errors %}validation-summary{% endif %}">
+                    {% csrf_token %}
+                    <div class="scrollable-form-wrapper">
+                        <div class="row g-3 form-grid">
+                            <div class="col-12">
+                                {% include 'includes/alerts_container.html' with errors=form.non_field_errors %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="{{ form.department.id_for_label }}" class="form-label small fw-semibold">Department <span class="text-danger">*</span></label>
+                                {{ form.department }}{% if form.department.errors %}<div class="invalid-feedback">{% for err in form.department.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.contributor.id_for_label }}" class="form-label small fw-semibold">Contributor</label>
+                                {{ form.contributor }}{% if form.contributor.errors %}<div class="invalid-feedback">{% for err in form.contributor.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="{{ form.submission_state.id_for_label }}" class="form-label small fw-semibold">Submission State</label>
+                                {{ form.submission_state }}{% if form.submission_state.errors %}<div class="invalid-feedback">{% for err in form.submission_state.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold text-muted">Last Updated</label>
+                                <div class="form-control bg-light text-muted">
+                                    {% if form.instance.last_updated_at %}
+                                        {{ form.instance.last_updated_at|date:"M d, Y H:i" }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <label for="{{ form.notes.id_for_label }}" class="form-label small fw-semibold">Notes / Content</label>
+                                {{ form.notes }}
+                                <div class="form-text">Paste the department's update, talking points, or supporting notes here.</div>
+                                {% if form.notes.errors %}<div class="invalid-feedback">{% for err in form.notes.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="{{ form.missing_info.id_for_label }}" class="form-label small fw-semibold text-warning">
+                                    <i class="bi bi-exclamation-triangle"></i> Missing Information
+                                </label>
+                                {{ form.missing_info }}
+                                <div class="form-text">Flag anything the reviewer needs to follow up on.</div>
+                                {% if form.missing_info.errors %}<div class="invalid-feedback">{% for err in form.missing_info.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.management_remarks.id_for_label }}" class="form-label small fw-semibold text-primary">
+                                    <i class="bi bi-chat-square-text"></i> Management Remarks
+                                </label>
+                                {{ form.management_remarks }}
+                                <div class="form-text">Visible to reviewers and approvers.</div>
+                                {% if form.management_remarks.errors %}<div class="invalid-feedback">{% for err in form.management_remarks.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sticky-submit-bar btn-primary-submit mt-3">
+                        <a href="{% url 'meetings:dept_submission_status_detail' meeting.pk %}" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2">
+                            <i class="bi bi-save"></i> Save Submission
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white border-bottom py-3">
+                <h3 class="h6 fw-semibold mb-0">Meeting Context</h3>
+            </div>
+            <div class="card-body small">
+                <div class="mb-2">
+                    <span class="text-muted">Meeting</span>
+                    <div class="fw-medium">{{ meeting.title }}</div>
+                </div>
+                <div class="mb-2">
+                    <span class="text-muted">Scheduled</span>
+                    <div class="fw-medium">
+                        {{ meeting.start_at|date:"M d, Y H:i" }}
+                        {% if meeting.end_at %} – {{ meeting.end_at|date:"H:i" }}{% endif %}
+                    </div>
+                </div>
+                {% if meeting.location %}
+                <div class="mb-2">
+                    <span class="text-muted">Location</span>
+                    <div class="fw-medium">{{ meeting.location }}</div>
+                </div>
+                {% endif %}
+                {% if meeting.chair %}
+                <div class="mb-2">
+                    <span class="text-muted">Chair</span>
+                    <div class="fw-medium">{{ meeting.chair.get_display_name }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom py-3">
+                <h3 class="h6 fw-semibold mb-0">Submission Checklist</h3>
+            </div>
+            <ul class="list-group list-group-flush small">
+                <li class="list-group-item d-flex align-items-center gap-2">
+                    <i class="bi bi-check-circle text-success"></i>
+                    <span>Department update content entered</span>
+                </li>
+                <li class="list-group-item d-flex align-items-center gap-2">
+                    <i class="bi bi-check-circle text-success"></i>
+                    <span>Contributor assigned</span>
+                </li>
+                <li class="list-group-item d-flex align-items-center gap-2">
+                    <i class="bi bi-check-circle text-success"></i>
+                    <span>Missing info documented (if any)</span>
+                </li>
+                <li class="list-group-item d-flex align-items-center gap-2">
+                    <i class="bi bi-check-circle text-success"></i>
+                    <span>Submission state marked correctly</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

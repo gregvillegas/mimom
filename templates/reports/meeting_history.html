@@ -1,0 +1,179 @@
+{% extends 'reports/base_printable.html' %}
+
+{% block page_title %}Meeting History | {{ company|default:"MIMOM" }}{% endblock %}
+
+{% block report_header %}
+<div class="doc-header">
+    <div class="company">{{ company|default:"MIMOM" }}</div>
+    <div class="title">Approved Meeting Snapshot History</div>
+    <div class="meta">
+        <span><strong>Document:</strong> MEETING-HISTORY-SNAPSHOTS</span>
+        <span><strong>Limit:</strong> Last 100 approved</span>
+        <span><strong>Version:</strong> 1.0</span>
+    </div>
+    <div class="meta">
+        {% if generated_at %}<span><strong>Generated:</strong> {{ generated_at|date:"Y-m-d H:i:s" }}</span>
+        {% else %}<span><strong>Generated:</strong> {% now "Y-m-d H:i:s" %}</span>{% endif %}
+        <span><strong>Records:</strong> {{ history_rows|length|default:0 }}</span>
+    </div>
+</div>
+{% endblock report_header %}
+
+{% block report_content %}
+
+<h2>Summary</h2>
+<table>
+    <tbody>
+        <tr>
+            <th style="width: 25%;">Company</th>
+            <td style="width: 25%;">{{ company|default:"MIMOM" }}</td>
+            <th style="width: 25%;">Report Type</th>
+            <td style="width: 25%;">Approved Meeting Snapshot History</td>
+        </tr>
+        <tr>
+            <th>Total Approved Snapshots</th>
+            <td class="num">{{ history_rows|length|default:0 }}</td>
+            <th>Report Date</th>
+            <td>{% now "Y-m-d" %}</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Approved Meeting Snapshot History</h2>
+<table>
+    <thead>
+        <tr>
+            <th style="width: 4%;">#</th>
+            <th style="width: 12%;">Reference</th>
+            <th style="width: 22%;">Meeting Title</th>
+            <th style="width: 6%;" class="num">Ver</th>
+            <th style="width: 10%;">Trigger</th>
+            <th style="width: 12%;">Approved At</th>
+            <th style="width: 12%;">Approved By</th>
+            <th style="width: 12%;">Published At</th>
+            <th style="width: 10%;">Published By</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in history_rows %}
+        <tr class="action-row">
+            {% with snap=r.snapshot|default:None meeting=r.meeting|default:None %}
+            <td>{{ forloop.counter }}</td>
+            <td style="font-family: monospace; font-size: 9pt;">
+                <strong>{{ r.reference|default:meeting.reference|default:"—" }}</strong>
+            </td>
+            <td>
+                {{ r.title|default:meeting.title|default:"—" }}
+                {% if snap %}
+                <div style="font-size: 8.5pt; color: #555; margin-top: 1pt;">
+                    {% if meeting and meeting.start_at %}{{ meeting.start_at|date:"Y-m-d H:i" }}{% endif %}
+                </div>
+                {% endif %}
+            </td>
+            <td class="num">
+                <span class="badge badge-secondary">v{{ r.version|default:snap.version|default:"?" }}</span>
+            </td>
+            <td>
+                {% if snap and snap.get_trigger_display %}
+                    {{ snap.get_trigger_display }}
+                {% elif r.trigger %}
+                    {{ r.trigger }}
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+            <td>
+                {% if r.approved_at %}
+                    {{ r.approved_at|date:"Y-m-d H:i" }}
+                {% else %}
+                    <em class="text-warning">Pending</em>
+                {% endif %}
+            </td>
+            <td>
+                {% if r.approved_by %}
+                    {{ r.approved_by.get_display_name|default:r.approved_by|truncatechars:24 }}
+                {% else %}
+                    <em>—</em>
+                {% endif %}
+            </td>
+            <td>
+                {% if r.published_at %}
+                    {{ r.published_at|date:"Y-m-d H:i" }}
+                {% else %}
+                    <em>Not published</em>
+                {% endif %}
+            </td>
+            <td>
+                {% if r.published_by %}
+                    {{ r.published_by.get_display_name|default:r.published_by|truncatechars:24 }}
+                {% else %}
+                    <em>—</em>
+                {% endif %}
+            </td>
+            {% endwith %}
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="9" style="text-align: center; padding: 20pt;">
+                <em>No approved meeting snapshots on record.</em>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Latest Transitions</h2>
+<table>
+    <thead>
+        <tr>
+            <th style="width: 5%;">#</th>
+            <th style="width: 15%;">Meeting Ref</th>
+            <th style="width: 25%;">Title</th>
+            <th style="width: 15%;">Latest Transition</th>
+            <th style="width: 15%;">Transitioned At</th>
+            <th style="width: 25%;">Transitioned By</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in history_rows %}
+        {% with tr=r.latest_transition|default:None %}
+        <tr>
+            <td>{{ forloop.counter }}</td>
+            <td style="font-family: monospace; font-size: 9pt;">{{ r.reference|default:"—" }}</td>
+            <td>{{ r.title|default:"—"|truncatechars:32 }}</td>
+            <td>
+                {% if tr %}
+                    {% if tr.from_status %}<span class="badge badge-secondary">{{ tr.from_status }}</span>
+                    &rarr;{% endif %}
+                    <span class="badge badge-success">{{ tr.to_status|default:"—" }}</span>
+                {% else %}
+                    <em>—</em>
+                {% endif %}
+            </td>
+            <td>
+                {% if tr and tr.transitioned_at %}
+                    {{ tr.transitioned_at|date:"Y-m-d H:i" }}
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+            <td>
+                {% if tr and tr.transitioned_by %}
+                    {{ tr.transitioned_by.get_display_name|default:tr.transitioned_by|truncatechars:28 }}
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr>
+            <td colspan="6" style="text-align: center; padding: 14pt;">
+                <em>No transitions recorded.</em>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock report_content %}

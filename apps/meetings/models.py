@@ -385,3 +385,246 @@ class AgendaItemAttachment(TimeStampedModel):
 
     def __str__(self) -> str:
         return self.display_name or self.file.name.split("/")[-1]
+
+
+SUBMISSION_NOT_STARTED = "NOT_STARTED"
+SUBMISSION_IN_PROGRESS = "IN_PROGRESS"
+SUBMISSION_SUBMITTED = "SUBMITTED"
+SUBMISSION_RETURNED = "RETURNED"
+SUBMISSION_ACCEPTED = "ACCEPTED"
+SUBMISSION_STATUS_CHOICES = [
+    (SUBMISSION_NOT_STARTED, "Not Started"),
+    (SUBMISSION_IN_PROGRESS, "In Progress"),
+    (SUBMISSION_SUBMITTED, "Submitted"),
+    (SUBMISSION_RETURNED, "Returned for Correction"),
+    (SUBMISSION_ACCEPTED, "Accepted by Reviewer"),
+]
+
+SECTION_OPENING_REMARKS = "OPENING"
+SECTION_DEPT_UPDATES = "DEPT_UPDATES"
+SECTION_ACTION_ITEMS = "ACTION_ITEMS"
+SECTION_SALES_PERFORMANCE = "SALES"
+SECTION_OLD_BUSINESS = "OLD_BUSINESS"
+SECTION_NEW_BUSINESS = "NEW_BUSINESS"
+SECTION_OTHER = "OTHER"
+SECTION_TYPE_CHOICES = [
+    (SECTION_OPENING_REMARKS, "Opening Remarks"),
+    (SECTION_DEPT_UPDATES, "Department Updates"),
+    (SECTION_ACTION_ITEMS, "Action Items Review"),
+    (SECTION_SALES_PERFORMANCE, "Sales Performance"),
+    (SECTION_OLD_BUSINESS, "Old Business"),
+    (SECTION_NEW_BUSINESS, "New Business"),
+    (SECTION_OTHER, "Other Topics"),
+]
+
+SNAPSHOT_TRIGGER_SUBMIT = "SUBMIT"
+SNAPSHOT_TRIGGER_APPROVE = "APPROVE"
+SNAPSHOT_TRIGGER_PUBLISH = "PUBLISH"
+SNAPSHOT_TRIGGER_MANUAL = "MANUAL"
+SNAPSHOT_TRIGGER_CHOICES = [
+    (SNAPSHOT_TRIGGER_SUBMIT, "Submitted for Review"),
+    (SNAPSHOT_TRIGGER_APPROVE, "Approved"),
+    (SNAPSHOT_TRIGGER_PUBLISH, "Published"),
+    (SNAPSHOT_TRIGGER_MANUAL, "Manual Snapshot"),
+]
+
+
+class MinutesSectionSpec(TimeStampedModel):
+    meeting_type = models.ForeignKey(
+        MeetingType,
+        on_delete=models.CASCADE,
+        related_name="section_specs",
+    )
+    section_type = models.CharField(max_length=20, choices=SECTION_TYPE_CHOICES)
+    order = models.PositiveIntegerField(default=0, db_index=True)
+    name = models.CharField(max_length=128)
+    is_required = models.BooleanField(default=True)
+    description = models.TextField(blank=True)
+
+    class Meta(TimeStampedModel.Meta):
+        verbose_name_plural = "Minutes Section Specs"
+        ordering = ["meeting_type_id", "order", "name"]
+        unique_together = [["meeting_type", "section_type"]]
+        indexes = [
+            models.Index(fields=["meeting_type", "order"]),
+        ]
+
+    def __str__(self) -> str:
+        flag = "R" if self.is_required else "O"
+        return f"[{flag}] {self.meeting_type.code} #{self.order} {self.name}"
+
+
+class DepartmentSubmission(TimeStampedModel):
+    meeting = models.ForeignKey(
+        Meeting,
+        on_delete=models.CASCADE,
+        related_name="department_submissions",
+    )
+    department = models.ForeignKey(
+        "accounts.Department",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="meeting_submissions",
+    )
+    contributor = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    submission_state = models.CharField(
+        max_length=20,
+        choices=SUBMISSION_STATUS_CHOICES,
+        default=SUBMISSION_NOT_STARTED,
+        db_index=True,
+    )
+    last_updated_at = models.DateTimeField(null=True, blank=True)
+    last_submitted_at = models.DateTimeField(null=True, blank=True)
+    submitted_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    missing_info = models.TextField(blank=True)
+    management_remarks = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta(TimeStampedModel.Meta):
+        verbose_name_plural = "Department Submissions"
+        ordering = ["meeting__start_at", "department__name"]
+        unique_together = [["meeting", "department"]]
+        indexes = [
+            models.Index(fields=["meeting", "submission_state"]),
+            models.Index(fields=["department", "submission_state"]),
+        ]
+
+    def __str__(self) -> str:
+        dept = self.department.name if self.department else "(cross)"
+        return f"{self.meeting.reference} · {dept} · {self.submission_state}"
+
+
+class ActionItemLink(TimeStampedModel):
+    agenda_item = models.ForeignKey(
+        AgendaItem,
+        on_delete=models.CASCADE,
+        related_name="action_item_links",
+    )
+    action_item = models.ForeignKey(
+        "action_items.ActionItem",
+        on_delete=models.CASCADE,
+        related_name="agenda_links",
+    )
+    created_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta(TimeStampedModel.Meta):
+        verbose_name_plural = "Action Item Links"
+        ordering = ["agenda_item__meeting__start_at", "agenda_item__order"]
+        unique_together = [["agenda_item", "action_item"]]
+        indexes = [
+            models.Index(fields=["agenda_item", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"#{self.agenda_item.order} → AI {self.action_item.pk}"
+
+
+class ApprovedMeetingSnapshot(TimeStampedModel):
+    meeting = models.ForeignKey(
+        Meeting,
+        on_delete=models.CASCADE,
+        related_name="approved_snapshots",
+    )
+    version = models.PositiveSmallIntegerField(db_index=True)
+    trigger = models.CharField(
+        max_length=10,
+        choices=SNAPSHOT_TRIGGER_CHOICES,
+        default=SNAPSHOT_TRIGGER_MANUAL,
+        db_index=True,
+    )
+    payload = models.JSONField(
+        default=dict,
+        help_text="Immutable serialized meeting content at snapshot time.",
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    published_at = models.DateTimeField(null=True, blank=True)
+    published_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta(TimeStampedModel.Meta):
+        verbose_name_plural = "Approved Meeting Snapshots"
+        ordering = ["meeting_id", "-version"]
+        unique_together = [["meeting", "version"]]
+        indexes = [
+            models.Index(fields=["meeting", "trigger", "version"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.meeting.reference or 'DRAFT'} v{self.version} ({self.trigger})"
+
+    def clean(self):
+        super().clean()
+        if not self.payload:
+            self.payload = {}
+        if self.pk:
+            from django.core.exceptions import ValidationError as VE
+
+            try:
+                current = ApprovedMeetingSnapshot.objects.values(
+                    "meeting_id", "version", "trigger", "payload", "approved_at", "approved_by_id"
+                ).get(pk=self.pk)
+            except ApprovedMeetingSnapshot.DoesNotExist:
+                return
+            locked_fields = (
+                "meeting_id",
+                "version",
+                "trigger",
+                "payload",
+                "approved_at",
+                "approved_by_id",
+            )
+            for f in locked_fields:
+                prior = current[f]
+                if f.endswith("_id"):
+                    prior = current[f]
+                    rel_name = f[:-3]
+                    obj = getattr(self, rel_name, None)
+                    new_val = getattr(obj, "pk", None) if obj is not None else None
+                    if prior != new_val:
+                        raise VE({f: f"ApprovedMeetingSnapshot.{f} is immutable after creation."})
+                elif f == "payload":
+                    prior_json = current.get("payload") or {}
+                    new_json = self.payload or {}
+                    if prior_json != new_json:
+                        raise VE({f: f"ApprovedMeetingSnapshot.{f} is immutable after creation."})
+                elif prior != getattr(self, f, None):
+                    raise VE({f: f"ApprovedMeetingSnapshot.{f} is immutable after creation."})
+
+    def save(self, *args, **kwargs):
+        force_insert = kwargs.get("force_insert", False)
+        if self.pk and not force_insert:
+            self.full_clean()
+        super().save(*args, **kwargs)

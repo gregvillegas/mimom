@@ -1,0 +1,193 @@
+{% extends 'reports/base_printable.html' %}
+{% load sales_formatting %}
+
+{% block page_title %}Sales Performance | {{ company|default:"MIMOM" }}{% endblock %}
+
+{% block report_header %}
+<div class="doc-header">
+    <div class="company">{{ company|default:"MIMOM" }}</div>
+    <div class="title">Sales Performance Report</div>
+    <div class="meta">
+        {% if period %}<span><strong>Period:</strong> {{ period.name|default:"—" }}</span>{% endif %}
+        <span><strong>Document:</strong> SALES-PERFORMANCE</span>
+        {% if period and period.currency %}<span><strong>Currency:</strong> {{ period.get_currency_display|default:period.currency|default:"PHP" }}</span>{% endif %}
+        <span><strong>Version:</strong> 1.0</span>
+    </div>
+    <div class="meta">
+        {% if generated_at %}<span><strong>Generated:</strong> {{ generated_at|date:"Y-m-d H:i:s" }}</span>
+        {% else %}<span><strong>Generated:</strong> {% now "Y-m-d H:i:s" %}</span>{% endif %}
+        {% if period %}<span><strong>Date Range:</strong> {{ period.start_date|default:"—" }} &rarr; {{ period.end_date|default:"—" }}</span>{% endif %}
+    </div>
+</div>
+{% endblock report_header %}
+
+{% block report_content %}
+
+<h2>Reporting Period</h2>
+<table>
+    <tbody>
+        <tr>
+            <th style="width: 20%;">Period Name</th>
+            <td style="width: 30%;">{% if period %}{{ period.name|default:"—" }}{% else %}—{% endif %}</td>
+            <th style="width: 20%;">Currency</th>
+            <td style="width: 30%;">{% if period %}{{ period.get_currency_display|default:period.currency|default:"PHP" }}{% else %}PHP{% endif %}</td>
+        </tr>
+        <tr>
+            <th>Start Date</th>
+            <td>{% if period and period.start_date %}{{ period.start_date }}{% else %}—{% endif %}</td>
+            <th>End Date</th>
+            <td>{% if period and period.end_date %}{{ period.end_date }}{% else %}—{% endif %}</td>
+        </tr>
+        <tr>
+            <th>Cut-off Date</th>
+            <td>{% if period and period.cut_off_date %}{{ period.cut_off_date }}{% else %}—{% endif %}</td>
+            <th>Weeks</th>
+            <td class="num">{% if period and period.weeks_count %}{{ period.weeks_count }}{% else %}—{% endif %}</td>
+        </tr>
+        <tr>
+            <th>Status</th>
+            <td>
+                {% if period %}
+                <span class="badge
+                    {% if period.status == 'LOCKED' or period.status == 'CLOSED' %}badge-success
+                    {% elif period.status == 'OPEN' or period.status == 'DRAFT' %}badge-secondary
+                    {% else %}badge-info{% endif %}">
+                    {{ period.get_status_display|default:period.status }}
+                </span>
+                {% else %}—{% endif %}
+            </td>
+            <th>Report Date</th>
+            <td>{% now "Y-m-d" %}</td>
+        </tr>
+    </tbody>
+</table>
+
+{% with currency=period.get_currency_display|default:period.currency|default:"PHP" total=totals.total|default:totals|default:None groups=totals.groups|default:None %}
+
+<h2>Period Totals</h2>
+<table>
+    <thead>
+        <tr>
+            <th style="width: 25%;">Metric</th>
+            <th style="width: 20%;" class="money">Target</th>
+            <th style="width: 20%;" class="money">Actual</th>
+            <th style="width: 15%;">% Achieved</th>
+            <th style="width: 20%;" class="money">Deficit / (Surplus)</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Revenue</strong></td>
+            <td class="money">{% if total and total.revenue_target %}{% currency_cell total.revenue_target currency %}{% else %}—{% endif %}</td>
+            <td class="money">{% if total and total.revenue_actual is not None %}{% currency_cell total.revenue_actual currency %}{% else %}—{% endif %}</td>
+            <td>{% if total and total.revenue_pct %}{{ total.revenue_pct|percentage }}{% else %}—{% endif %}</td>
+            <td class="money{% if total and total.revenue_deficit and total.revenue_deficit < 0 %} negative{% endif %}">
+                {% if total and total.revenue_deficit is not None %}{% currency_cell total.revenue_deficit currency signed=True %}{% else %}—{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td><strong>Profit</strong></td>
+            <td class="money">{% if total and total.profit_target %}{% currency_cell total.profit_target currency %}{% else %}—{% endif %}</td>
+            <td class="money{% if total and total.profit_actual and total.profit_actual < 0 %} negative{% endif %}">
+                {% if total and total.profit_actual is not None %}{% currency_cell total.profit_actual currency %}{% else %}—{% endif %}
+            </td>
+            <td>{% if total and total.profit_pct %}{{ total.profit_pct|percentage }}{% else %}—{% endif %}</td>
+            <td class="money{% if total and total.profit_deficit and total.profit_deficit < 0 %} negative{% endif %}">
+                {% if total and total.profit_deficit is not None %}{% currency_cell total.profit_deficit currency signed=True %}{% else %}—{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td><strong>Orders</strong></td>
+            <td class="num">{% if total and total.orders_target %}{{ total.orders_target }}{% else %}—{% endif %}</td>
+            <td class="num">{% if total and total.orders_actual is not None %}{{ total.orders_actual }}{% else %}—{% endif %}</td>
+            <td>—</td>
+            <td class="num">
+                {% if total and total.orders_target and total.orders_actual is not None %}
+                {{ total.orders_actual }}
+                {% else %}—{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td><strong>Deliveries</strong></td>
+            <td class="num">{% if total and total.deliveries_target %}{{ total.deliveries_target }}{% else %}—{% endif %}</td>
+            <td class="num">{% if total and total.deliveries_achieved is not None %}{{ total.deliveries_achieved }}{% else %}—{% endif %}</td>
+            <td>{% if total and total.on_time_pct %}{{ total.on_time_pct|percentage }} on-time{% else %}—{% endif %}</td>
+            <td>—</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Group Performance Detail</h2>
+<table>
+    <thead>
+        <tr>
+            <th style="width: 4%;">#</th>
+            <th style="width: 9%;">Group Code</th>
+            <th style="width: 9%;">Team</th>
+            <th style="width: 9%;" class="money">Rev Target</th>
+            <th style="width: 9%;" class="money">Rev Actual</th>
+            <th style="width: 7%;">Rev %</th>
+            <th style="width: 9%;" class="money">Rev Deficit</th>
+            <th style="width: 9%;" class="money">Profit Actual</th>
+            <th style="width: 7%;">Profit %</th>
+            <th style="width: 7%;" class="num">Orders Tgt</th>
+            <th style="width: 7%;" class="num">Orders Act</th>
+            <th style="width: 7%;" class="num">Del Tgt</th>
+            <th style="width: 7%;" class="num">Del Ach</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for g in groups %}
+        <tr class="action-row">
+            <td>{{ forloop.counter }}</td>
+            <td><strong>{{ g.group_code|default:g.code|default:g.group|default:"—" }}</strong></td>
+            <td>{{ g.team_name|default:g.team|default:"—" }}</td>
+            <td class="money">{% if g.revenue_target %}{% currency_cell g.revenue_target currency %}{% else %}—{% endif %}</td>
+            <td class="money">{% if g.revenue_actual is not None %}{% currency_cell g.revenue_actual currency %}{% else %}—{% endif %}</td>
+            <td>{{ g.revenue_pct|default:"0"|percentage }}</td>
+            <td class="money{% if g.revenue_deficit and g.revenue_deficit < 0 %} negative{% endif %}">
+                {% if g.revenue_deficit is not None %}{% currency_cell g.revenue_deficit currency signed=True %}{% else %}—{% endif %}
+            </td>
+            <td class="money{% if g.profit_actual and g.profit_actual < 0 %} negative{% endif %}">
+                {% if g.profit_actual is not None %}{% currency_cell g.profit_actual currency %}{% else %}—{% endif %}
+            </td>
+            <td>{{ g.profit_pct|default:"0"|percentage }}</td>
+            <td class="num">{{ g.orders_target|default:"—" }}</td>
+            <td class="num">{{ g.orders_actual|default:g.orders|default:"—" }}</td>
+            <td class="num">{{ g.deliveries_target|default:"—" }}</td>
+            <td class="num">{{ g.deliveries_achieved|default:g.deliveries|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="13" style="text-align: center; padding: 20pt;">
+            <em>No group performance data for this period.</em>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+    {% if total %}
+    <tfoot>
+        <tr>
+            <td colspan="3" style="text-align: right;"><strong>TOTAL</strong></td>
+            <td class="money"><strong>{% if total.revenue_target %}{% currency_cell total.revenue_target currency %}{% endif %}</strong></td>
+            <td class="money"><strong>{% if total.revenue_actual is not None %}{% currency_cell total.revenue_actual currency %}{% endif %}</strong></td>
+            <td><strong>{{ total.revenue_pct|default:"0"|percentage }}</strong></td>
+            <td class="money{% if total.revenue_deficit and total.revenue_deficit < 0 %} negative{% endif %}">
+                <strong>{% if total.revenue_deficit is not None %}{% currency_cell total.revenue_deficit currency signed=True %}{% endif %}</strong>
+            </td>
+            <td class="money{% if total.profit_actual and total.profit_actual < 0 %} negative{% endif %}">
+                <strong>{% if total.profit_actual is not None %}{% currency_cell total.profit_actual currency %}{% endif %}</strong>
+            </td>
+            <td><strong>{{ total.profit_pct|default:"0"|percentage }}</strong></td>
+            <td class="num"><strong>{{ total.orders_target|default:"" }}</strong></td>
+            <td class="num"><strong>{{ total.orders_actual|default:"" }}</strong></td>
+            <td class="num"><strong>{{ total.deliveries_target|default:"" }}</strong></td>
+            <td class="num"><strong>{{ total.deliveries_achieved|default:"" }}</strong></td>
+        </tr>
+    </tfoot>
+    {% endif %}
+</table>
+
+{% endwith %}
+
+{% endblock report_content %}

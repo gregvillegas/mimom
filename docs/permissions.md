@@ -456,3 +456,216 @@ Simple tags registered in `apps.core.templatetags.permissions`:
 | LOCK           | `GroupPerformanceSnapshot.save()` fires when `is_snapshot_locked()` → T   |
 | EXPORT         | `ExcelPeriodExport.get()` streaming response returns period XLSX to user  |
 
+---
+
+## §5 — MINUTES ROLE MATRIX (Phase 6)
+
+### 5.1 — Predicate × Role Matrix (8 predicates × 6 roles)
+
+The table below defines, for each of the 8 minutes-submission permission
+predicates, whether a user holding **only** the column's role is allowed
+(Y = allowed, N = denied). Row headers are the predicate names as defined
+in `apps.core.permissions` (see §5.2 for the predicate signatures).
+
+A user holding **multiple roles** inherits the union (a single Y anywhere
+in the row for their roles grants access). `is_superuser` short-circuits
+every predicate to Y regardless of the table. All predicates additionally
+require `is_authenticated=True AND is_active=True` — inactive users always
+see N even if their roles would permit it.
+
+| Predicate                            | SysAdmin | MgmtAdmin | Chair | Secretary | DeptContr | Viewer |
+|--------------------------------------|:--------:|:---------:|:-----:|:---------:|:---------:|:------:|
+| `can_submit_minutes`                 |    Y     |     Y     |   N   |     N     |   **Y**¹  |   N    |
+| `can_return_minutes`                 |    Y     |     Y     |   Y   |     N     |     N     |   N    |
+| `can_resubmit_minutes`               |    Y     |     Y     |   N   |     N     |   **Y**²  |   N    |
+| `can_approve_minutes`                |    Y     |     Y     |   Y   |     N     |     N     |   N    |
+| `can_publish_minutes`                |    Y     |     Y     |   N   |     N     |     N     |   N    |
+| `can_close_minutes`                  |    Y     |     Y     |   Y   |     N     |     N     |   N    |
+| `can_reopen_minutes`                 |    Y     |     Y     |   N   |     N     |     N     |   N    |
+| `can_create_snapshot`                |    Y     |     Y     |   N   |     N     |     N     |   N    |
+
+**Footnotes** (object-level scoping on top of the role gate):
+
+1. `can_submit_minutes` also requires `user_in_department_contributors(user, submission.department)`
+   AND `submission.status ∈ {IN_PROGRESS, RETURNED}`. A DeptContr assigned to
+   the **wrong** department sees N even though the table shows Y.
+2. `can_resubmit_minutes` is a strict alias for `can_submit_minutes` in Phase 6
+   (`return can_submit_minutes(user, submission)`). It exists as a separate
+   predicate so Phase 7 can tighten resubmit rules without touching submit.
+
+### 5.2 — Predicate Signatures Reference
+
+All 8 predicates live in `apps.core.permissions` with the following
+calling convention:
+
+```python
+# Takes a MeetingMinutesSubmission object (object-scoped)
+can_submit_minutes(user, submission)      -> bool
+can_return_minutes(user, submission)      -> bool
+can_resubmit_minutes(user, submission)    -> bool
+can_approve_minutes(user, submission)     -> bool
+can_publish_minutes(user, submission)     -> bool
+can_close_minutes(user, submission)       -> bool
+can_reopen_minutes(user, submission)      -> bool
+
+# Takes a Meeting object (creates a snapshot scoped to the meeting)
+can_create_snapshot(user, meeting)        -> bool
+```
+
+### 5.3 — MinutesSubmission Author Override
+
+Unlike Meetings (which grant `MEETING_AUTHOR_ROLES` to `created_by`), the
+submission object has **no** author override. The user who first edited
+section 1 does **not** gain special privileges on the submission row —
+access is purely by role + department-contributor scoping. This avoids a
+degenerate case where a contributor who left the department can still
+resubmit old rows.
+
+### 5.4 — Template Tags (8 new tags in `permissions` library, Phase 6)
+
+Mirroring the pattern of meetings/action-items template tags:
+
+```django
+{% load permissions %}
+
+{% can_submit_minutes_tag submission as can_submit %}
+{% can_return_minutes_tag submission as can_return %}
+{% can_resubmit_minutes_tag submission as can_resubmit %}
+{% can_approve_minutes_tag submission as can_approve %}
+{% can_publish_minutes_tag submission as can_publish %}
+{% can_close_minutes_tag submission as can_close %}
+{% can_reopen_minutes_tag submission as can_reopen %}
+{% can_create_snapshot_tag meeting as can_create_snap %}
+
+{% if can_submit %}<button>Submit minutes</button>{% endif %}
+```
+
+Each tag resolves the user via `_user_from_context(context)` (works in
+navbar, inline-forms, and detail-page render contexts without explicit
+`user=` parameter) and calls the matching predicate.
+
+### 5.5 — Form-Level Role Enforcement (Second Gate Beyond Template)
+
+Every transition form in `apps.meetings.forms` repeats the predicate check
+in its `clean()` method so that a user crafting a raw POST (bypassing the
+template-hidden button) still receives a `403 PermissionDenied` at form
+validation time:
+
+```python
+class MinutesReturnForm(forms.Form):
+    ...
+    def clean(self):
+        if not can_return_minutes(self._user, self._submission):
+            raise PermissionDenied("not authorized to return this submission")
+```
+
+Combined with the view-level `MinutesRoleRequiredMixin` (which runs before
+`form_valid`), this gives the minutes domain the same 4-layer lock pattern
+documented for Meetings in §2 (template tag → view mixin → form.clean →
+service-layer predicate re-check).
+
+---
+
+## §6 — REPORTS ROLE MATRIX (Phase 7)
+
+### 6.1 — Capability × Role Matrix (2×6)
+
+The table below defines, for the two reports-domain capabilities, whether a
+user holding **only** the column's role is allowed (Y = allowed, N = denied).
+Row headers are the capability names used by the permission predicates (see
+§6.2 for signatures). As with all other matrices in this document, a user
+holding multiple roles inherits the **union** (a single Y anywhere in their
+role columns grants access), `is_superuser` short-circuits every predicate to
+Y, and inactive users always see N regardless of roles.
+
+| Capability            | SysAdmin | MgmtAdmin | Chair | Secretary | DeptContr | Viewer |
+|-----------------------|:--------:|:---------:|:-----:|:---------:|:---------:|:------:|
+| **View Report**       |    Y     |     Y     |   Y   |     Y     |     Y     |   Y¹   |
+| **Export Report**     |    Y     |     Y     |   Y   |     Y     |     N     |   N    |
+
+**Footnotes:**
+
+1. **Authorized Audit Report exception** — the `authorized-audit-report` slug
+   restricts viewing to `AUDIT_REPORT_VIEW_ROLES = (SysAdmin, MgmtAdmin, Chair,
+   Secretary, DeptContr)`, so a bare **Viewer** sees N for that one report
+   even though the matrix shows Y. All other 9 reports respect the matrix Y
+   for Viewer.
+
+### 6.2 — Predicate Signatures Reference
+
+Two primary predicates govern the reports domain. Both live in code; the
+view-level predicate is re-exported from `apps.reports.permissions` for
+convenience (it delegates to the core predicate plus a slug-specific gate for
+the audit report).
+
+```python
+# apps.reports.permissions — view-layer gate (slug-aware)
+def can_view_report(user, report_slug: str) -> bool
+    # True if: user is active+authenticated AND (superuser OR
+    # (slug == authorized-audit-report → AUDIT_REPORT_VIEW_ROLES else
+    #  REPORT_VIEW_ROLES = all 6 roles))
+
+# apps.core.permissions — role-only export gate
+REPORT_EXPORT_ROLES = (
+    ROLE_SYSTEM_ADMIN, ROLE_MANAGEMENT_ADMIN,
+    ROLE_MEETING_CHAIR, ROLE_MINUTES_SECRETARY,
+)
+
+def can_export_reports(user) -> bool
+    # True if: user is active+authenticated AND (superuser OR in REPORT_EXPORT_ROLES)
+```
+
+A third mixin enforces export permission at the CBV dispatch layer:
+
+```python
+# apps.core.permissions
+class ReportExportRequiredMixin(UserPassesTestMixin):
+    def test_func(self):
+        return can_export_reports(self.request.user)
+```
+
+### 6.3 — Template Tag: `can_export_reports_tag`
+
+One new template tag is registered in the `permissions` library (Phase 7).
+It follows the standard `_user_from_context(context)` pattern so it works in
+navbar, report index, and report detail render contexts without an explicit
+`user=` parameter.
+
+```django
+{% load permissions %}
+
+{% can_export_reports_tag as can_export %}
+
+{% if can_export %}
+  <div class="btn-group export-menu">
+    <a class="btn" href="{{ excel_url }}">Excel</a>
+    <a class="btn" href="{{ word_url }}">Word</a>
+    <a class="btn" href="{{ pdf_url }}">PDF</a>
+  </div>
+{% endif %}
+```
+
+The tag is implemented in `apps.core.templatetags.permissions` (line 272) and
+simply delegates to `can_export_reports(user)` after resolving the active
+user from the render context.
+
+### 6.4 — Four-Format Coverage Note
+
+Each of the 10 reports (see `docs/reports_model.md` §1 for the catalog) is
+produced in **up to 4 formats** depending on the report's classification:
+
+| Format    | Content Class              | Permission Gate        |
+|-----------|----------------------------|------------------------|
+| **HTML**  | All reports (printable)    | `can_view_report`      |
+| **PDF**   | All reports (HTML → PDF)   | `can_export_reports`   |
+| **Word**  | All reports (DOCX)         | `can_export_reports`   |
+| **Excel** | Tabular reports only²      | `can_export_reports`   |
+
+² See `docs/reports_model.md` §2 for the exact format-by-report grid. Excel
+is available for every report in Phase 7 (all 10 reports are tabular or
+contain tabular sections), giving **4-format coverage across the full
+catalog**. Each format is served from its own view class (mixins:
+`PrintableHtmlMixin`, `PdfExportMixin`, `WordExportMixin`,
+`ExcelExportMixin`) and each non-HTML format export writes an
+`AuditLog.ACTION_EXPORT` event before streaming the response.
+

@@ -1,0 +1,64 @@
+{% load static %}
+<div class="border rounded-3 bg-white p-3 mb-3">
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+        <div class="flex-grow-1">
+            {% if agenda_item %}
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+                <span class="fw-bold text-primary">#{{ agenda_item.order|default:'' }}</span>
+                {% if agenda_item.category %}
+                    <span class="badge bg-light text-dark border border-light">{{ agenda_item.category.name }}</span>
+                {% endif %}
+                {% if agenda_item.department %}
+                    <span class="small text-muted">{{ agenda_item.department.name }}</span>
+                {% endif %}
+                {% if agenda_item.is_confidential %}
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+                        <i class="bi bi-shield-lock-fill"></i> Confidential
+                    </span>
+                {% endif %}
+            </div>
+            <div class="fw-semibold mb-1">{{ agenda_item.title }}</div>
+            {% if agenda_item.owner %}
+                <div class="small text-muted">Owner: {{ agenda_item.owner.get_display_name }}</div>
+            {% endif %}
+            {% endif %}
+        </div>
+        <div class="d-flex flex-column gap-1 align-items-end">
+            <label class="small fw-semibold text-muted mb-0">Status</label>
+            {% if form %}{{ form.item_status }}{% endif %}
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold text-info">
+                <i class="bi bi-chat-dots"></i> Discussion
+            </label>
+            {% if form %}{{ form.discussion }}{% endif %}
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small fw-semibold text-success">
+                <i class="bi bi-journal-check"></i> Decision
+            </label>
+            {% if form %}{{ form.decision }}{% endif %}
+        </div>
+    </div>
+
+    {% if form %}
+        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+    {% endif %}
+
+    {% if agenda_item and agenda_item.action_item_links.all %}
+    <div class="mt-3 pt-3 border-top small">
+        <div class="text-muted fw-semibold mb-2">Linked Action Items</div>
+        <div class="d-flex flex-wrap gap-2">
+            {% for link in agenda_item.action_item_links.all %}
+                <a href="{% url 'action_items:actionitem_detail' link.action_item.pk %}" class="badge bg-primary-subtle text-primary text-decoration-none d-inline-flex align-items-center gap-1">
+                    <i class="bi bi-box-arrow-up-right"></i>
+                    {{ link.action_item.reference }} · {{ link.action_item.title|truncatechars:40 }}
+                </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>

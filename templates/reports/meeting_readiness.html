@@ -1,0 +1,194 @@
+{% extends 'reports/base_printable.html' %}
+
+{% block page_title %}Meeting Readiness | {{ company|default:"MIMOM" }}{% endblock %}
+
+{% block report_header %}
+<div class="doc-header">
+    <div class="company">{{ company|default:"MIMOM" }}</div>
+    <div class="title">Meeting Readiness Report</div>
+    <div class="meta">
+        {% if meeting and meeting.reference %}<span><strong>Meeting Ref:</strong> {{ meeting.reference }}</span>{% endif %}
+        {% if meeting %}<span><strong>Scheduled:</strong> {{ meeting.start_at|date:"Y-m-d H:i" }}</span>{% endif %}
+        <span><strong>Document:</strong> MEETING-READINESS</span>
+        <span><strong>Version:</strong> 1.0</span>
+    </div>
+    <div class="meta">
+        {% if generated_at %}<span><strong>Generated:</strong> {{ generated_at|date:"Y-m-d H:i:s" }}</span>
+        {% else %}<span><strong>Generated:</strong> {% now "Y-m-d H:i:s" %}</span>{% endif %}
+        {% if submissions %}<span><strong>Departments:</strong> {{ submissions|length }}</span>{% endif %}
+    </div>
+</div>
+{% endblock report_header %}
+
+{% block report_content %}
+
+<h2>Meeting Information</h2>
+<table>
+    <tbody>
+        <tr>
+            <th style="width: 20%;">Reference</th>
+            <td style="width: 30%;">
+                {% if meeting %}{{ meeting.reference|default:"—" }}{% else %}—{% endif %}
+            </td>
+            <th style="width: 20%;">Meeting Type</th>
+            <td style="width: 30%;">
+                {% if meeting and meeting.type %}{{ meeting.get_type_display|default:meeting.type }}{% else %}—{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <th>Title</th>
+            <td colspan="3">
+                {% if meeting %}{{ meeting.title|default:"—" }}{% else %}—{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <th>Scheduled Start</th>
+            <td>
+                {% if meeting and meeting.start_at %}{{ meeting.start_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}
+            </td>
+            <th>Scheduled End</th>
+            <td>
+                {% if meeting and meeting.end_at %}{{ meeting.end_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}
+            </td>
+        </tr>
+        <tr>
+            <th>Location</th>
+            <td>
+                {% if meeting %}{{ meeting.location|default:"—" }}{% else %}—{% endif %}
+            </td>
+            <th>Current Status</th>
+            <td>
+                {% if meeting %}
+                <span class="badge
+                    {% if meeting.status == 'APPROVED' or meeting.status == 'PUBLISHED' %}badge-success
+                    {% elif meeting.status == 'DRAFT' or meeting.status == 'PREPARING' %}badge-secondary
+                    {% elif meeting.status == 'SUBMITTED' %}badge-warning
+                    {% elif meeting.status == 'RETURNED_FOR_CORRECTION' %}badge-danger
+                    {% else %}badge-info{% endif %}">
+                    {{ meeting.get_status_display|default:meeting.status }}
+                </span>
+                {% else %}—{% endif %}
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>Department Submission Readiness</h2>
+<table>
+    <thead>
+        <tr>
+            <th style="width: 4%;">#</th>
+            <th style="width: 20%;">Department</th>
+            <th style="width: 14%;">Submission State</th>
+            <th style="width: 15%;">Last Updated</th>
+            <th style="width: 17%;">Contributor</th>
+            <th style="width: 15%;">Missing Info</th>
+            <th style="width: 15%;">Remarks</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for s in submissions %}
+        {% with state=s.submission_state state_label=s.get_submission_state_display|default:s.submission_state %}
+        <tr class="action-row">
+            <td>{{ forloop.counter }}</td>
+            <td>
+                <strong>
+                    {% if s.department %}{{ s.department.name|default:"—" }}{% else %}—{% endif %}
+                </strong>
+            </td>
+            <td>
+                <span class="badge
+                    {% if state == 'NOT_STARTED' %}badge-secondary
+                    {% elif state == 'IN_PROGRESS' %}badge-warning
+                    {% elif state == 'SUBMITTED' %}badge-info
+                    {% elif state == 'RETURNED' %}badge-danger
+                    {% elif state == 'ACCEPTED' %}badge-success
+                    {% else %}badge-secondary{% endif %}">
+                    {{ state_label|default:state }}
+                </span>
+            </td>
+            <td>
+                {% if s.last_updated_at %}{{ s.last_updated_at|date:"Y-m-d H:i" }}
+                {% elif s.updated_at %}{{ s.updated_at|date:"Y-m-d H:i" }}
+                {% else %}<em>—</em>{% endif %}
+            </td>
+            <td>
+                {% if s.contributor %}{{ s.contributor.get_display_name|default:s.contributor }}
+                {% else %}<em>Not assigned</em>{% endif %}
+            </td>
+            <td style="font-size: 9pt;">
+                {% if s.missing_info %}{{ s.missing_info|default:""|truncatewords:10 }}
+                {% elif state == 'NOT_STARTED' or state == 'IN_PROGRESS' %}<em class="text-danger">Submission incomplete</em>
+                {% else %}<em>None</em>{% endif %}
+            </td>
+            <td style="font-size: 9pt;">
+                {% if s.remarks %}{{ s.remarks|default:""|truncatewords:12 }}
+                {% elif s.last_submitted_at %}Submitted {{ s.last_submitted_at|date:"Y-m-d H:i" }}
+                {% else %}<em>—</em>{% endif %}
+            </td>
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr>
+            <td colspan="7" style="text-align: center; padding: 20pt;">
+                <em>No department readiness data for this meeting.</em>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Readiness Summary</h2>
+<table>
+    <thead>
+        <tr>
+            <th style="width: 35%;">Submission Status</th>
+            <th style="width: 20%;" class="num">Count</th>
+            <th style="width: 45%;">Notes</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><span class="badge badge-success">ACCEPTED</span></td>
+            <td class="num">
+                {% for s in submissions %}{% if s.submission_state == 'ACCEPTED' %}1{% endif %}{% endfor %}
+            </td>
+            <td>Department submission reviewed and accepted.</td>
+        </tr>
+        <tr>
+            <td><span class="badge badge-info">SUBMITTED</span></td>
+            <td class="num">
+                {% for s in submissions %}{% if s.submission_state == 'SUBMITTED' %}1{% endif %}{% endfor %}
+            </td>
+            <td>Submitted by contributor; awaiting review.</td>
+        </tr>
+        <tr>
+            <td><span class="badge badge-warning">IN_PROGRESS</span></td>
+            <td class="num">
+                {% for s in submissions %}{% if s.submission_state == 'IN_PROGRESS' %}1{% endif %}{% endfor %}
+            </td>
+            <td>Contributor actively drafting submission.</td>
+        </tr>
+        <tr>
+            <td><span class="badge badge-danger">RETURNED</span></td>
+            <td class="num">
+                {% for s in submissions %}{% if s.submission_state == 'RETURNED' %}1{% endif %}{% endfor %}
+            </td>
+            <td>Returned for corrections; needs re-submission.</td>
+        </tr>
+        <tr>
+            <td><span class="badge badge-secondary">NOT_STARTED</span></td>
+            <td class="num">
+                {% for s in submissions %}{% if s.submission_state == 'NOT_STARTED' %}1{% endif %}{% endfor %}
+            </td>
+            <td>Contributor has not yet started.</td>
+        </tr>
+        <tr class="subtotal">
+            <td><strong>Total Departments</strong></td>
+            <td class="num"><strong>{{ submissions|length }}</strong></td>
+            <td></td>
+        </tr>
+    </tbody>
+</table>
+
+{% endblock report_content %}

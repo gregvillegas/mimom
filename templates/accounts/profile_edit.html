@@ -10,47 +10,52 @@
                 </a>
             </div>
             <div class="card-body p-4">
-                <form method="post" class="needs-validation" novalidate>
+                <form method="post" class="needs-validation" novalidate id="profileEditForm" aria-describedby="{% if form.non_field_errors %}validation-summary{% endif %}">
                     {% csrf_token %}
-
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label for="{{ form.first_name.id_for_label }}" class="form-label fw-medium small text-body-secondary">First Name</label>
-                            {{ form.first_name }}
-                        </div>
-                        <div class="col-md-6">
-                            <label for="{{ form.last_name.id_for_label }}" class="form-label fw-medium small text-body-secondary">Last Name</label>
-                            {{ form.last_name }}
-                        </div>
-                        <div class="col-md-6">
-                            <label for="{{ form.display_name.id_for_label }}" class="form-label fw-medium small text-body-secondary">Display Name</label>
-                            {{ form.display_name }}
-                            <div class="form-text small">If blank, uses first + last name.</div>
-                        </div>
-                        <div class="col-md-3">
-                            <label for="{{ form.initials.id_for_label }}" class="form-label fw-medium small text-body-secondary">Initials</label>
-                            {{ form.initials }}
-                        </div>
-                        <div class="col-md-3">
-                            <label for="{{ form.theme.id_for_label }}" class="form-label fw-medium small text-body-secondary">Theme</label>
-                            {{ form.theme }}
-                        </div>
-                        <div class="col-md-6">
-                            <label for="{{ form.phone.id_for_label }}" class="form-label fw-medium small text-body-secondary">Phone</label>
-                            {{ form.phone }}
-                        </div>
-                        <div class="col-md-6">
-                            <label for="{{ form.signature_text.id_for_label }}" class="form-label fw-medium small text-body-secondary">Signature Line</label>
-                            {{ form.signature_text }}
-                            <div class="form-text small">Used in minutes and reports.</div>
-                        </div>
-                        <div class="col-md-12">
-                            <label for="{{ form.bio.id_for_label }}" class="form-label fw-medium small text-body-secondary">Bio</label>
-                            <textarea name="{{ form.bio.html_name }}" id="{{ form.bio.id_for_label }}" rows="4" class="form-control">{{ form.bio.value|default:'' }}</textarea>
+                    <div class="scrollable-form-wrapper">
+                        <div class="row g-3 form-grid">
+                            <div class="col-12">
+                                {% include 'includes/alerts_container.html' with errors=form.non_field_errors %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.first_name.id_for_label }}" class="form-label fw-medium small text-body-secondary">First Name</label>
+                                {{ form.first_name }}{% if form.first_name.errors %}<div class="invalid-feedback">{% for err in form.first_name.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.last_name.id_for_label }}" class="form-label fw-medium small text-body-secondary">Last Name</label>
+                                {{ form.last_name }}{% if form.last_name.errors %}<div class="invalid-feedback">{% for err in form.last_name.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.display_name.id_for_label }}" class="form-label fw-medium small text-body-secondary">Display Name</label>
+                                {{ form.display_name }}
+                                <div class="form-text small">If blank, uses first + last name.</div>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="{{ form.initials.id_for_label }}" class="form-label fw-medium small text-body-secondary">Initials</label>
+                                {{ form.initials }}{% if form.initials.errors %}<div class="invalid-feedback">{% for err in form.initials.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                            </div>
+                            <div class="col-md-3">
+                                <label for="{{ form.theme.id_for_label }}" class="form-label fw-medium small text-body-secondary">Theme</label>
+                                {{ form.theme }}{% if form.theme.errors %}<div class="invalid-feedback">{% for err in form.theme.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.phone.id_for_label }}" class="form-label fw-medium small text-body-secondary">Phone</label>
+                                {{ form.phone }}{% if form.phone.errors %}<div class="invalid-feedback">{% for err in form.phone.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label for="{{ form.signature_text.id_for_label }}" class="form-label fw-medium small text-body-secondary">Signature Line</label>
+                                {{ form.signature_text }}
+                                <div class="form-text small">Used in minutes and reports.</div>
+                            </div>
+                            <div class="col-md-12">
+                                <label for="{{ form.bio.id_for_label }}" class="form-label fw-medium small text-body-secondary">Bio</label>
+                                <textarea name="{{ form.bio.html_name }}" id="{{ form.bio.id_for_label }}" rows="4" class="form-control{% if form.bio.errors %} is-invalid{% endif %}">{{ form.bio.value|default:'' }}</textarea>
+                                {% if form.bio.errors %}<div class="invalid-feedback">{% for err in form.bio.errors %}{{ err }}{% endfor %}</div>{% endif %}
+                            </div>
                         </div>
                     </div>
 
-                    <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                    <div class="sticky-submit-bar btn-primary-submit mt-3">
                         <a href="{% url 'accounts:profile_me' %}" class="btn btn-outline-secondary">Cancel</a>
                         <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2">
                             <i class="bi bi-check2-square"></i> Save Profile
